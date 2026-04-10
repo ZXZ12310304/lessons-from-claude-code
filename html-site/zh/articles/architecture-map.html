@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>架构地图：开发者如何阅读 Lessons from Claude Code V2</title>
+  <link rel="stylesheet" href="../../assets/style.css" />
+  <script defer src="../../assets/site.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container site-header-inner">
+      <a class="brand" href="../index.html">Lessons from Claude Code</a>
+      <div class="controls">
+        <a class="toggle-btn" href="../../articles/architecture-map.html">English</a>
+        <button id="theme-toggle" class="toggle-btn" type="button">Light</button>
+      </div>
+      <nav class="nav" aria-label="Main"><a class="" href="../index.html">首页</a><a class="active" href="../map.html">地图</a><a class="" href="../mechanism.html">机制</a><a class="" href="../decision.html">决策</a><a class="" href="../build.html">复建</a></nav>
+    </div>
+  </header>
+  <main class="main"><div class="container"><p class="lead"><a href="../map.html">返回 地图</a></p>
+<div class="article-layout">
+  <aside class="article-sidebar">
+  <h3>地图</h3>
+  <p class="lead"><a href="../map.html">返回 地图</a></p>
+  <h3>同轨文章</h3>
+  <nav class="sidebar-nav"><a class='active' href='architecture-map.html'>架构地图：开发者如何阅读 Lessons from Claude Code V2</a><a class='' href='evidence-model-and-claim-discipline.html'>证据模型：把代码事实与推断分离</a></nav>
+  <h3>前置阅读</h3>
+  <ul><li class='lead'>无</li></ul>
+  <h3>代码锚点</h3>
+  <ul><li><code>claude-code-main/src/QueryEngine.ts</code><br/><span class='lead'>QueryEngine, submitMessage</span></li><li><code>claude-code-main/src/query.ts</code><br/><span class='lead'>queryLoop, state transitions</span></li><li><code>claude-code-main/src/Tool.ts</code><br/><span class='lead'>Tool contract</span></li></ul>
+</aside>
+  <article class="article">
+    <h1>架构地图：开发者如何阅读 Lessons from Claude Code V2</h1>
+    <p class="lead">从阅读路径、证据规范、章节依赖关系三个维度定义站点使用方式，避免“只看热闹不看机制”。</p>
+    <div class="meta">
+      <span class="badge">intermediate</span>
+      <span class="badge">L1</span>
+      <span class="badge">E2</span>
+      <span class="badge">更新 2026-04-06</span>
+    </div>
+    <div class="meta"><span class='tag'>reading-map</span><span class='tag'>developer-docs</span><span class='tag'>information-architecture</span></div>
+    <div class="article-body"><h1>架构地图：开发者如何阅读 Lessons from Claude Code V2</h1>
+<blockquote>
+<p>这篇不是“内容摘要”，而是“阅读协议”。<br>
+你看完它，应该知道从哪篇开始、每篇拿什么、什么时候该停下来自己实现一次。</p>
+</blockquote>
+<h2>1. 先看全景：这站点到底在做什么</h2>
+<p>这个项目现在不再是“事件介绍站”，而是开发者向的工程分析站。核心目标有三个：</p>
+<ol>
+<li>把源码里的运行机制讲清楚（不是讲新闻）。</li>
+<li>把设计决策讲清楚（不是只讲“怎么做”）。</li>
+<li>给出能直接落地的复建路径（不是只讲观点）。</li>
+</ol>
+<p>对应到站点结构就是五条轨道：</p>
+<ul>
+<li><code>map</code>：阅读方法和证据规范。</li>
+<li><code>mechanism</code>：运行机制拆解。</li>
+<li><code>decision</code>：架构权衡与边界。</li>
+<li><code>build</code>：最小实现和工程清单。</li>
+</ul>
+<h2>2. 为什么要这样组织</h2>
+<p>很多类似内容会卡在两个极端：</p>
+<ul>
+<li>只讲大词：读完“懂了”，但做不出来。</li>
+<li>只贴代码：读完“看了”，但不知道为什么。</li>
+</ul>
+<p>我们用双线结构把这两个问题拆开处理：</p>
+<pre><code class="language-text">机制线（What happens）  -&gt;  决策线（Why this design）
+          \                        /
+           \                      /
+            ------ 复建线（How to build）
+</code></pre>
+<p>机制线给事实，决策线给理由，复建线给动作。</p>
+<h2>3. 这套文章的默认阅读顺序</h2>
+<p>如果你是第一次来，建议按下面顺序：</p>
+<pre><code class="language-mermaid">flowchart LR
+  A[runtime-entry-and-turn-lifecycle] --&gt; B[query-loop-state-machine-and-continue-transitions]
+  B --&gt; C[tool-contract-and-dispatch-pipeline]
+  C --&gt; D[permissions-runtime-evaluation]
+  D --&gt; E[multi-stage-compaction-pipeline]
+  E --&gt; F[why-query-loop-owns-control-plane]
+  F --&gt; G[build-a-minimal-query-loop]
+</code></pre>
+<p>这条路径的好处是：你先把“系统怎么跑”跑通，再看“为什么这么设计”，最后再“自己搭一版”。</p>
+<h2>4. 代码锚点怎么用</h2>
+<p>后续文章会反复引用这几个核心入口：</p>
+<ul>
+<li><code>claude-code-main/src/QueryEngine.ts</code></li>
+<li><code>claude-code-main/src/query.ts</code></li>
+<li><code>claude-code-main/src/Tool.ts</code></li>
+</ul>
+<p>请把它们当“总路标”而不是“具体细节”。<br>
+读机制文时先确认这些入口在调用链中的位置，再看局部实现，不然容易在细节里迷路。</p>
+<h2>5. 读的时候要避免的三个误区</h2>
+<h3>误区 A：把模型能力当系统能力</h3>
+<p>模型答得好，不代表运行时稳定。<br>
+生产级问题大多出在循环控制、权限顺序、预算治理这些“非模型层”。</p>
+<h3>误区 B：把安全理解成弹窗</h3>
+<p>弹窗是 UI，安全边界在判定顺序。<br>
+<code>deny -&gt; ask -&gt; allow</code> 一旦顺序错位，UI 再漂亮也挡不住风险。</p>
+<h3>误区 C：把压缩当成一个 summarize 函数</h3>
+<p>长会话可持续性不是“压一下”就行，而是预算检查、分层压缩、结果外置、回读路径的组合机制。</p>
+<h2>6. 你可以怎样使用这套内容</h2>
+<p>两种实战方式：</p>
+<ul>
+<li><strong>架构评审模式</strong>：先读 mechanism + decision，两篇一组，输出评审结论。</li>
+<li><strong>实现驱动模式</strong>：直接读 build，再回读 mechanism 对齐设计边界。</li>
+</ul>
+<p>一个简单模板：</p>
+<pre><code class="language-markdown">模块：
+当前实现：
+对应机制文章：
+对应决策文章：
+本团队取舍：
+一周内可执行改动：
+</code></pre>
+<h2>7. 本站写作约束（你会一直看到它）</h2>
+<p>每篇固定 8 段：问题、约束、锚点、运行序列、失败模式、权衡、复建清单、下一篇。<br>
+不是为了形式统一，而是为了让文章可被工程团队复用，不依赖作者个人表达风格。</p>
+<h2>8. 读完这篇后你应该做什么</h2>
+<p>直接打开：</p>
+<ul>
+<li><code>evidence-model-and-claim-discipline</code>（先把证据规则装进脑子）</li>
+<li><code>runtime-entry-and-turn-lifecycle</code>（进入第一篇机制正文）</li>
+</ul></div>
+    <p class="footer">Markdown 源文件： <code>contents/00-map/architecture-map.md</code></p>
+  </article>
+</div></div></main>
+</body>
+</html>

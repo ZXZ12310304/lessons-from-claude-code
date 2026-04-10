@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Decision</title>
+  <link rel="stylesheet" href="assets/style.css" />
+  <script defer src="assets/site.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container site-header-inner">
+      <a class="brand" href="index.html">Lessons from Claude Code</a>
+      <div class="controls">
+        <a class="toggle-btn" href="zh/decision.html">中文</a>
+        <button id="theme-toggle" class="toggle-btn" type="button">Light</button>
+      </div>
+      <nav class="nav" aria-label="Main"><a class="" href="index.html">Home</a><a class="" href="map.html">Map</a><a class="" href="mechanism.html">Mechanism</a><a class="active" href="decision.html">Decision</a><a class="" href="build.html">Build</a></nav>
+    </div>
+  </header>
+  <main class="main"><div class="container"><section class="hero">
+  <h1>Decision</h1>
+  <p>Why the architecture is shaped this way.</p>
+</section>
+<section class="section">
+  <div class="grid"><a class='card' href='articles/why-query-loop-owns-control-plane.html'><h3>Why Query Loop must assume control plane</h3><p class='lead'>Justify that centralizing retries, budgeting, tool injection, and compaction coordination in the query loop is architectural design, not a bad smell.</p><div class='meta'><span class='badge'>L3</span><span class='badge'>E2</span></div><div class='meta'><span class='tag'>decision</span><span class='tag'>control-plane</span><span class='tag'>orchestration</span></div></a><a class='card' href='articles/why-permission-check-order-is-boundary.html'><h3>Why is the order of permission determination itself a security boundary?</h3><p class='lead'>Explain why the evaluation order of deny/ask/allow is more critical than the pop-up copy, and how to prevent implicit privilege escalation.</p><div class='meta'><span class='badge'>L3</span><span class='badge'>E2</span></div><div class='meta'><span class='tag'>decision</span><span class='tag'>permissions</span><span class='tag'>security-boundary</span></div></a></div>
+</section></div></main>
+</body>
+</html>

@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Mechanism</title>
+  <link rel="stylesheet" href="assets/style.css" />
+  <script defer src="assets/site.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container site-header-inner">
+      <a class="brand" href="index.html">Lessons from Claude Code</a>
+      <div class="controls">
+        <a class="toggle-btn" href="zh/mechanism.html">中文</a>
+        <button id="theme-toggle" class="toggle-btn" type="button">Light</button>
+      </div>
+      <nav class="nav" aria-label="Main"><a class="" href="index.html">Home</a><a class="" href="map.html">Map</a><a class="active" href="mechanism.html">Mechanism</a><a class="" href="decision.html">Decision</a><a class="" href="build.html">Build</a></nav>
+    </div>
+  </header>
+  <main class="main"><div class="container"><section class="hero">
+  <h1>Mechanism</h1>
+  <p>Runtime, tools, permissions, and compaction.</p>
+</section>
+<section class="section">
+  <div class="grid"><a class='card' href='articles/runtime-entry-and-turn-lifecycle.html'><h3>Runtime entry and Turn life cycle</h3><p class='lead'>From submitMessage to round submission, dismantle how a user input enters the main loop and is implemented as session state.</p><div class='meta'><span class='badge'>L2</span><span class='badge'>E1</span></div><div class='meta'><span class='tag'>runtime</span><span class='tag'>query-engine</span><span class='tag'>lifecycle</span></div></a><a class='card' href='articles/query-loop-state-machine-and-continue-transitions.html'><h3>Query Loop state machine and Continue migration</h3><p class='lead'>Restore the while main loop into a state machine and explain the design of continue positions, exit conditions and exception branches.</p><div class='meta'><span class='badge'>L2</span><span class='badge'>E1</span></div><div class='meta'><span class='tag'>query-loop</span><span class='tag'>state-machine</span><span class='tag'>continuation</span></div></a><a class='card' href='articles/tool-contract-and-dispatch-pipeline.html'><h3>Tool Contracts and Distribution Execution Pipelines</h3><p class='lead'>Explain that Tool is not a function list, but a governance contract; and disassemble tool distribution, concurrent orchestration and streaming execution paths.</p><div class='meta'><span class='badge'>L2</span><span class='badge'>E1</span></div><div class='meta'><span class='tag'>tool-system</span><span class='tag'>contract</span><span class='tag'>dispatch</span><span class='tag'>streaming</span></div></a><a class='card' href='articles/context-budget-and-tool-result-storage.html'><h3>Contextual Budgeting and Tool Result Storage Governance</h3><p class='lead'>The budget check, staged compression and tool result placement are combined into a unified management chain to solve the problem of instability in long sessions.</p><div class='meta'><span class='badge'>L2</span><span class='badge'>E1</span></div><div class='meta'><span class='tag'>context</span><span class='tag'>budget</span><span class='tag'>tool-result-storage</span><span class='tag'>long-session</span></div></a><a class='card' href='articles/permissions-runtime-evaluation.html'><h3>Runtime decision chain of permission system</h3><p class='lead'>Decompose the runtime security boundary from three layers: permission mode, rule priority, and shell security analysis.</p><div class='meta'><span class='badge'>L2</span><span class='badge'>E1</span></div><div class='meta'><span class='tag'>permissions</span><span class='tag'>policy</span><span class='tag'>security</span><span class='tag'>runtime-governance</span></div></a><a class='card' href='articles/multi-stage-compaction-pipeline.html'><h3>Multi-stage context compression pipeline</h3><p class='lead'>Disassemble the trigger sequence and circuit breaking mechanism of snip, microcompact, autocompact and session memory compact.</p><div class='meta'><span class='badge'>L2</span><span class='badge'>E1</span></div><div class='meta'><span class='tag'>compaction</span><span class='tag'>context</span><span class='tag'>reliability</span><span class='tag'>circuit-breaker</span></div></a></div>
+</section></div></main>
+</body>
+</html>

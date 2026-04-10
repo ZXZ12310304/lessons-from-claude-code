@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Build safe and controllable tool runtimes</title>
+  <link rel="stylesheet" href="../assets/style.css" />
+  <script defer src="../assets/site.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container site-header-inner">
+      <a class="brand" href="../index.html">Lessons from Claude Code</a>
+      <div class="controls">
+        <a class="toggle-btn" href="../zh/articles/build-a-safe-tool-runtime.html">中文</a>
+        <button id="theme-toggle" class="toggle-btn" type="button">Light</button>
+      </div>
+      <nav class="nav" aria-label="Main"><a class="" href="../index.html">Home</a><a class="" href="../map.html">Map</a><a class="" href="../mechanism.html">Mechanism</a><a class="" href="../decision.html">Decision</a><a class="active" href="../build.html">Build</a></nav>
+    </div>
+  </header>
+  <main class="main"><div class="container"><p class="lead"><a href="../build.html">Back to Build</a></p>
+<div class="article-layout">
+  <aside class="article-sidebar">
+  <h3>Build</h3>
+  <p class="lead"><a href="../build.html">Back to Build</a></p>
+  <h3>Track Articles</h3>
+  <nav class="sidebar-nav"><a class='' href='build-a-minimal-query-loop.html'>Rebuild a minimal usable Query Loop</a><a class='active' href='build-a-safe-tool-runtime.html'>Build safe and controllable tool runtimes</a></nav>
+  <h3>Prerequisites</h3>
+  <ul><li><a href='tool-contract-and-dispatch-pipeline.html'><code>tool-contract-and-dispatch-pipeline</code></a></li><li><a href='why-permission-check-order-is-boundary.html'><code>why-permission-check-order-is-boundary</code></a></li></ul>
+  <h3>Code Anchors</h3>
+  <ul><li><code>claude-code-main/src/Tool.ts</code><br/><span class='lead'>tool contract fields</span></li><li><code>claude-code-main/src/utils/permissions/filesystem.ts</code><br/><span class='lead'>policy evaluation</span></li><li><code>claude-code-main/src/services/tools/StreamingToolExecutor.ts</code><br/><span class='lead'>execution streaming</span></li></ul>
+</aside>
+  <article class="article">
+    <h1>Build safe and controllable tool runtimes</h1>
+    <p class="lead">A tool runtime list is given from an implementation perspective: contract constraints, permission gateways, concurrency control, and result governance.</p>
+    <div class="meta">
+      <span class="badge">advanced</span>
+      <span class="badge">L3</span>
+      <span class="badge">E2</span>
+      <span class="badge">Updated 2026-04-06</span>
+    </div>
+    <div class="meta"><span class='tag'>build</span><span class='tag'>tool-runtime</span><span class='tag'>safety</span><span class='tag'>policy</span></div>
+    <div class="article-body"><h1>Build safe and controllable tool runtimes</h1>
+<blockquote>
+<p>The tool runtime is a high-risk area for coding agent accidents. Let’s put up guardrails first, and then talk about capacity expansion.</p>
+</blockquote>
+<h2>1. Four-layer minimum architecture</h2>
+<pre><code class="language-mermaid">graph TD
+  A[契约层 Contract] --&gt; B[权限层 Policy Gate]
+  B --&gt; C[调度层 Orchestrator]
+  C --&gt; D[执行层 Executor]
+  D --&gt; E[结果治理 Result Budget]
+  E --&gt; F[回注 Query Loop]
+</code></pre>
+<p>The loss of any one of these six nodes will directly amplify the probability of failure.</p>
+<h2>2. Contract layer</h2>
+<p>每个工具必须至少声明：</p>
+<ul>
+<li><code>inputSchema</code></li>
+<li><code>isReadOnly</code></li>
+<li><code>isConcurrencySafe</code></li>
+<li><code>maxResultSize</code></li>
+</ul>
+<p>Without a contract, the subsequent strategy layer cannot make deterministic judgments.</p>
+<h2>3. Permission level</h2>
+<p>Fixed strategy determination before execution:</p>
+<pre><code class="language-text">schema 校验 -&gt; deny/ask/allow -&gt; 附加安全检查 -&gt; 执行
+</code></pre>
+<p>The key points are "before execution" and "cannot be bypassed".</p>
+<h2>4. Scheduling layer</h2>
+<p>The default is serial, and concurrency is released according to the contract:</p>
+<ul>
+<li>Reading tools prioritize concurrency.</li>
+<li>Write tools exclusively for batches.</li>
+<li>High-risk tools are approved separately.</li>
+</ul>
+<h2>5. Execution layer</h2>
+<p>Introducing streaming events (progress/result/error) has three values:</p>
+<ol>
+<li>Visible to the user.</li>
+<li>Debugging is visible.</li>
+<li>Interrupts are visible.</li>
+</ol>
+<h2>6. Results governance layer</h2>
+<p>Don't put large results directly back into the context, change it to "external + reference".
+Otherwise the more successful the tool becomes, the more crowded the context becomes and the more degraded the subsequent reasoning becomes.</p>
+<h2>7. Check before going online</h2>
+<ul>
+<li>Whether concurrent writing tools are blocked correctly.</li>
+<li>Whether the permission conflict scenario is reproducible stably.</li>
+<li>Whether large results can be read back by reference.</li>
+<li>Whether the state is recoverable after an interruption.</li>
+</ul>
+<h2>8. Summary</h2>
+<p>When running security tools, it is not about "adding a few more ifs", but connecting contracts, permissions, scheduling, execution, and result management into an auditable chain.</p>
+<h2>Next Read</h2>
+<ul>
+<li><code>multi-stage-compaction-pipeline</code></li>
+</ul></div>
+    <p class="footer">Source markdown: <code>contents/30-build/build-a-safe-tool-runtime_EN.md</code></p>
+  </article>
+</div></div></main>
+</body>
+</html>

@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Why Query Loop must assume control plane</title>
+  <link rel="stylesheet" href="../assets/style.css" />
+  <script defer src="../assets/site.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container site-header-inner">
+      <a class="brand" href="../index.html">Lessons from Claude Code</a>
+      <div class="controls">
+        <a class="toggle-btn" href="../zh/articles/why-query-loop-owns-control-plane.html">中文</a>
+        <button id="theme-toggle" class="toggle-btn" type="button">Light</button>
+      </div>
+      <nav class="nav" aria-label="Main"><a class="" href="../index.html">Home</a><a class="" href="../map.html">Map</a><a class="" href="../mechanism.html">Mechanism</a><a class="active" href="../decision.html">Decision</a><a class="" href="../build.html">Build</a></nav>
+    </div>
+  </header>
+  <main class="main"><div class="container"><p class="lead"><a href="../decision.html">Back to Decision</a></p>
+<div class="article-layout">
+  <aside class="article-sidebar">
+  <h3>Decision</h3>
+  <p class="lead"><a href="../decision.html">Back to Decision</a></p>
+  <h3>Track Articles</h3>
+  <nav class="sidebar-nav"><a class='active' href='why-query-loop-owns-control-plane.html'>Why Query Loop must assume control plane</a><a class='' href='why-permission-check-order-is-boundary.html'>Why is the order of permission determination itself a security boundary?</a></nav>
+  <h3>Prerequisites</h3>
+  <ul><li><a href='query-loop-state-machine-and-continue-transitions.html'><code>query-loop-state-machine-and-continue-transitions</code></a></li></ul>
+  <h3>Code Anchors</h3>
+  <ul><li><code>claude-code-main/src/query.ts</code><br/><span class='lead'>orchestration timeline, budget/retry/compact integration</span></li><li><code>claude-code-main/src/QueryEngine.ts</code><br/><span class='lead'>session ownership</span></li></ul>
+</aside>
+  <article class="article">
+    <h1>Why Query Loop must assume control plane</h1>
+    <p class="lead">Justify that centralizing retries, budgeting, tool injection, and compaction coordination in the query loop is architectural design, not a bad smell.</p>
+    <div class="meta">
+      <span class="badge">advanced</span>
+      <span class="badge">L3</span>
+      <span class="badge">E2</span>
+      <span class="badge">Updated 2026-04-06</span>
+    </div>
+    <div class="meta"><span class='tag'>decision</span><span class='tag'>control-plane</span><span class='tag'>orchestration</span></div>
+    <div class="article-body"><h1>Why Query Loop must assume control plane</h1>
+<blockquote>
+<p>This article discusses a controversial issue:
+<code>query.ts</code> looks heavy, why not take it apart completely?</p>
+</blockquote>
+<h2>1. Acknowledge your intuition first: it’s indeed “big”</h2>
+<p>Judging from the look and feel of the code, everyone’s first reaction is usually right:
+The <code>query</code> layer carries too much logic and looks like a "God function".</p>
+<p>But in the agent runtime, judging whether it is good or bad cannot just look at the length of the file, but also whether the control rights are clear.
+If splitting leads to splitting of control, the system changes from "complex but controllable" to "elegant but uncontrollable".</p>
+<h2>2. Definition of control plane</h2>
+<p>The control plane mentioned here is not a control plane in the sense of infrastructure.
+In this project, it means:</p>
+<ul>
+<li>Who decides whether to continue or quit this round.</li>
+<li>Who decides when the budget checks.</li>
+<li>Who decides when tool results are back-injected.</li>
+<li>Who decides retry and compaction priorities.</li>
+</ul>
+<p>If these decisions are spread across multiple modules, timing conflicts can occur.</p>
+<h2>3. Why the concentration on <code>query.ts</code> is intentional</h2>
+<p>From <code>claude-code-main/src/query.ts</code> we can see:
+Budgets, tools, compression, and retries all advance around the same round of state.</p>
+<p>If you split them into "independent services", three types of problems will usually occur:</p>
+<ol>
+<li>Each module "thinks it is the main process".</li>
+<li>Shared state becomes implicitly coupled.</li>
+<li>Accident troubleshooting requires splicing multiple timelines.</li>
+</ol>
+<p>The cost of centralized control is increased local complexity, and the benefit is consistent global behavior.</p>
+<h2>4. When should it be dismantled and when should it not be dismantled?</h2>
+<p>What can be dismantled is capability, but what should not be dismantled is sovereignty.</p>
+<h3>should be dismantled</h3>
+<ul>
+<li>Tool implementation details</li>
+<li>Compression algorithm implementation</li>
+<li>Permission check implementation</li>
+</ul>
+<h3>Should not be dismantled</h3>
+<ul>
+<li>turn transfer sovereignty</li>
+<li>Exit Judgment Sovereignty</li>
+<li>Budget trigger timing sovereignty</li>
+</ul>
+<p>In a word: <strong> capabilities can be modularized, and timing control must be centralized. </strong></p>
+<h2>5. A common counterexample</h2>
+<p>The counterexample structure usually looks like this:</p>
+<pre><code class="language-text">RetryService 决定重试
+CompactService 决定压缩
+ToolService 决定回注时机
+QueryService 只做转发
+</code></pre>
+<p>This looks elegantly layered, but in actual operation there will be a "wait for each other + overwrite each other" conflict.
+In the end, anyone can change the status, and no one is responsible for the results.</p>
+<h2>6. How to retain centralized control and prevent code from getting out of control</h2>
+<p>You can use this compromise strategy:</p>
+<ul>
+<li>Preserve state machines and sequential decisions at the <code>query</code> level.</li>
+<li>Downgrade replaceable algorithms into pure capability modules.</li>
+<li>Record input and output contracts for each capability invocation.</li>
+</ul>
+<p>Doing so keeps sovereignty centralized while layering implementation complexity.</p>
+<h2>7. Judgment criteria during review</h2>
+<p>When you discuss "whether to split the query layer" in the team, don't just look at the volume, focus on three things:</p>
+<ol>
+<li>Who has the final exit judgment after demolition?</li>
+<li>Will the status writing still converge at a single point after the disassembly?</li>
+<li>Can a single time series log be maintained after disassembly?</li>
+</ol>
+<p>If you can't answer one of the three questions clearly, don't open it yet.</p>
+<h2>8. Summary</h2>
+<p>What I want to emphasize in this article is:
+<code>query</code> Heavy layers are not necessarily a bad taste;
+In many agent systems, it is the control plane intentionally responsible for cross-domain arbitration.</p>
+<h2>Next Read</h2>
+<ul>
+<li><code>why-permission-check-order-is-boundary</code></li>
+<li><code>build-a-minimal-query-loop</code></li>
+</ul></div>
+    <p class="footer">Source markdown: <code>contents/20-decision/why-query-loop-owns-control-plane_EN.md</code></p>
+  </article>
+</div></div></main>
+</body>
+</html>

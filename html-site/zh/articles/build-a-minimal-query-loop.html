@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>复建一个最小可用 Query Loop</title>
+  <link rel="stylesheet" href="../../assets/style.css" />
+  <script defer src="../../assets/site.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container site-header-inner">
+      <a class="brand" href="../index.html">Lessons from Claude Code</a>
+      <div class="controls">
+        <a class="toggle-btn" href="../../articles/build-a-minimal-query-loop.html">English</a>
+        <button id="theme-toggle" class="toggle-btn" type="button">Light</button>
+      </div>
+      <nav class="nav" aria-label="Main"><a class="" href="../index.html">首页</a><a class="" href="../map.html">地图</a><a class="" href="../mechanism.html">机制</a><a class="" href="../decision.html">决策</a><a class="active" href="../build.html">复建</a></nav>
+    </div>
+  </header>
+  <main class="main"><div class="container"><p class="lead"><a href="../build.html">返回 复建</a></p>
+<div class="article-layout">
+  <aside class="article-sidebar">
+  <h3>复建</h3>
+  <p class="lead"><a href="../build.html">返回 复建</a></p>
+  <h3>同轨文章</h3>
+  <nav class="sidebar-nav"><a class='active' href='build-a-minimal-query-loop.html'>复建一个最小可用 Query Loop</a><a class='' href='build-a-safe-tool-runtime.html'>构建安全可控的工具运行时</a></nav>
+  <h3>前置阅读</h3>
+  <ul><li><a href='runtime-entry-and-turn-lifecycle.html'><code>runtime-entry-and-turn-lifecycle</code></a></li><li><a href='tool-contract-and-dispatch-pipeline.html'><code>tool-contract-and-dispatch-pipeline</code></a></li></ul>
+  <h3>代码锚点</h3>
+  <ul><li><code>claude-code-main/src/query.ts</code><br/><span class='lead'>loop skeleton</span></li><li><code>claude-code-main/src/services/tools/toolOrchestration.ts</code><br/><span class='lead'>tool dispatch</span></li><li><code>claude-code-main/src/services/compact/autoCompact.ts</code><br/><span class='lead'>compaction threshold</span></li></ul>
+</aside>
+  <article class="article">
+    <h1>复建一个最小可用 Query Loop</h1>
+    <p class="lead">给出可落地的最小主循环实现：预算检查、工具回合、退出提交、重试护栏。</p>
+    <div class="meta">
+      <span class="badge">intermediate</span>
+      <span class="badge">L3</span>
+      <span class="badge">E2</span>
+      <span class="badge">更新 2026-04-06</span>
+    </div>
+    <div class="meta"><span class='tag'>build</span><span class='tag'>implementation</span><span class='tag'>query-loop</span></div>
+    <div class="article-body"><h1>复建一个最小可用 Query Loop</h1>
+<blockquote>
+<p>这篇不讲“理想架构”，只讲“可以一周内做出来并且不至于马上翻车”的最小版本。</p>
+</blockquote>
+<h2>1. 最小可用版本必须包含什么</h2>
+<p>如果你时间有限，最小闭环至少要有四块：</p>
+<ol>
+<li>会话状态对象（能跨轮保留）。</li>
+<li>query loop（能处理 continue）。</li>
+<li>工具分发（能把 tool call 跑完并回注）。</li>
+<li>预算检查（能避免回合直接超窗）。</li>
+</ol>
+<p>缺任何一块，都不是“最小可用”，而是“演示代码”。</p>
+<h2>2. 第一版骨架代码</h2>
+<pre><code class="language-python">while True:
+    ctx = build_context(session)
+    enforce_budget(ctx)
+
+    step = call_model(ctx)
+    if step.tool_calls:
+        results = run_tools(step.tool_calls)
+        session = append_tool_results(session, results)
+        continue
+
+    session = commit_assistant_output(session, step.output)
+    break
+</code></pre>
+<p>这个骨架的重点不是“简单”，而是它已经具备了回合闭环。</p>
+<h2>3. 三个第一天就要做的工程约束</h2>
+<h3>约束 A：提交与展示分离</h3>
+<p>流式输出可以先显示，但最终提交必须单点发生。<br>
+否则恢复时很容易对不上历史。</p>
+<h3>约束 B：工具回注必须结构化</h3>
+<p>不能把工具输出当一段自由文本拼接进历史。<br>
+至少要有工具名、调用参数、结果摘要、结果引用。</p>
+<h3>约束 C：预算检查必须前置</h3>
+<p>预算后置意味着你已经付出成本再发现超限，属于被动止损。</p>
+<h2>4. 第二阶段该加什么（不要一上来全做）</h2>
+<p>建议按这个顺序迭代：</p>
+<ol>
+<li>重试策略（可恢复）。</li>
+<li>权限评估（可治理）。</li>
+<li>分阶段压缩（可持续）。</li>
+</ol>
+<p>不要一开始就上复杂记忆系统和多 agent，先把单循环做稳。</p>
+<h2>5. 一个实用目录建议</h2>
+<pre><code class="language-text">src/
+  runtime/
+    query_loop.py
+    session_state.py
+  tools/
+    contracts.py
+    orchestrator.py
+  safety/
+    permissions.py
+    budget.py
+</code></pre>
+<p>目录不重要，重要的是“主权收敛”：回合状态在一个地方收敛提交。</p>
+<h2>6. 验证这版是否真的可用</h2>
+<p>做三组测试就够：</p>
+<ul>
+<li>工具分支连续三轮调用是否状态一致。</li>
+<li>模拟超窗是否会触发预算控制并继续运行。</li>
+<li>模拟中断重启后是否能恢复到正确回合。</li>
+</ul>
+<p>三组都过，再加功能；三组不过，不要扩功能。</p>
+<h2>7. 常见“看起来能跑，实际上不可用”的征兆</h2>
+<ul>
+<li>每轮都新建 session 对象。</li>
+<li>工具失败后直接丢弃，不记入状态。</li>
+<li>预算逻辑只在日志里提示，不真正控制流程。</li>
+</ul>
+<p>这些问题早期不痛，流量上来后会很痛。</p>
+<h2>8. 小结</h2>
+<p>最小可用 query loop 的核心不是“代码少”，而是“闭环完整”。<br>
+闭环完整，才能承受后续复杂度。</p>
+<h2>Next Read</h2>
+<ul>
+<li><code>build-a-safe-tool-runtime</code></li>
+</ul></div>
+    <p class="footer">Markdown 源文件： <code>contents/30-build/build-a-minimal-query-loop.md</code></p>
+  </article>
+</div></div></main>
+</body>
+</html>

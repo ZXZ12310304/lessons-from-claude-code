@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Tool Contracts and Distribution Execution Pipelines</title>
+  <link rel="stylesheet" href="../assets/style.css" />
+  <script defer src="../assets/site.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container site-header-inner">
+      <a class="brand" href="../index.html">Lessons from Claude Code</a>
+      <div class="controls">
+        <a class="toggle-btn" href="../zh/articles/tool-contract-and-dispatch-pipeline.html">中文</a>
+        <button id="theme-toggle" class="toggle-btn" type="button">Light</button>
+      </div>
+      <nav class="nav" aria-label="Main"><a class="" href="../index.html">Home</a><a class="" href="../map.html">Map</a><a class="active" href="../mechanism.html">Mechanism</a><a class="" href="../decision.html">Decision</a><a class="" href="../build.html">Build</a></nav>
+    </div>
+  </header>
+  <main class="main"><div class="container"><p class="lead"><a href="../mechanism.html">Back to Mechanism</a></p>
+<div class="article-layout">
+  <aside class="article-sidebar">
+  <h3>Mechanism</h3>
+  <p class="lead"><a href="../mechanism.html">Back to Mechanism</a></p>
+  <h3>Track Articles</h3>
+  <nav class="sidebar-nav"><a class='' href='runtime-entry-and-turn-lifecycle.html'>Runtime entry and Turn life cycle</a><a class='' href='query-loop-state-machine-and-continue-transitions.html'>Query Loop state machine and Continue migration</a><a class='active' href='tool-contract-and-dispatch-pipeline.html'>Tool Contracts and Distribution Execution Pipelines</a><a class='' href='context-budget-and-tool-result-storage.html'>Contextual Budgeting and Tool Result Storage Governance</a><a class='' href='permissions-runtime-evaluation.html'>Runtime decision chain of permission system</a><a class='' href='multi-stage-compaction-pipeline.html'>Multi-stage context compression pipeline</a></nav>
+  <h3>Prerequisites</h3>
+  <ul><li><a href='query-loop-state-machine-and-continue-transitions.html'><code>query-loop-state-machine-and-continue-transitions</code></a></li></ul>
+  <h3>Code Anchors</h3>
+  <ul><li><code>claude-code-main/src/Tool.ts</code><br/><span class='lead'>Tool interface, isReadOnly, isConcurrencySafe, maxResultSize</span></li><li><code>claude-code-main/src/tools.ts</code><br/><span class='lead'>tool registry</span></li><li><code>claude-code-main/src/services/tools/toolOrchestration.ts</code><br/><span class='lead'>batch orchestration</span></li><li><code>claude-code-main/src/services/tools/StreamingToolExecutor.ts</code><br/><span class='lead'>streaming execution</span></li></ul>
+</aside>
+  <article class="article">
+    <h1>Tool Contracts and Distribution Execution Pipelines</h1>
+    <p class="lead">Explain that Tool is not a function list, but a governance contract; and disassemble tool distribution, concurrent orchestration and streaming execution paths.</p>
+    <div class="meta">
+      <span class="badge">advanced</span>
+      <span class="badge">L2</span>
+      <span class="badge">E1</span>
+      <span class="badge">Updated 2026-04-06</span>
+    </div>
+    <div class="meta"><span class='tag'>tool-system</span><span class='tag'>contract</span><span class='tag'>dispatch</span><span class='tag'>streaming</span></div>
+    <div class="article-body"><h1>Tool Contracts and Distribution Execution Pipelines</h1>
+<blockquote>
+<p>Tool system is not a "function collection", but a unified layer of "capabilities + risks + execution constraints".</p>
+</blockquote>
+<h2>1. Why Tool must be a contract</h2>
+<p>If it is just <code>name -&gt; handler</code>, the system cannot determine:</p>
+<ul>
+<li>Whether it is read-only.</li>
+<li>Whether it can be concurrent.</li>
+<li>Will it produce oversized results?</li>
+<li>How to recover after failure.</li>
+</ul>
+<p>The value of <code>claude-code-main/src/Tool.ts</code> is to prepend these to the contract fields.</p>
+<h2>2. Full link from registration to execution</h2>
+<pre><code class="language-mermaid">flowchart LR
+  A[tools.ts 注册] --&gt; B[query.ts 选择工具]
+  B --&gt; C[toolOrchestration 分批调度]
+  C --&gt; D[StreamingToolExecutor 执行]
+  D --&gt; E[工具结果规范化]
+  E --&gt; F[回注 query loop]
+</code></pre>
+<p>This chain is not “one layer of packages” but multi-layered governance.</p>
+<h2>3. Why is the concurrency attribute the correctness field?</h2>
+<p><code>isConcurrencySafe</code> is not an optimization term, but a correctness bound.</p>
+<ul>
+<li>Read tool concurrency is generally safe.</li>
+<li>Concurrency in writing tools can easily cause workspace contention.</li>
+</ul>
+<p>Without this field, you get a "good throughput, random state" system.</p>
+<h2>4. Why do you need a streaming executor?</h2>
+<p>The meaning of <code>claude-code-main/src/services/tools/StreamingToolExecutor.ts</code>:</p>
+<ol>
+<li>The progress is visible to avoid misjudgment and stuck.</li>
+<li>Intermediate states are observable and easy to interrupt.</li>
+<li>The results are returned in fragments to reduce tail latency.</li>
+</ol>
+<pre><code class="language-typescript">for await (const event of executor.run(toolCalls)) {
+  if (event.type === &quot;progress&quot;) render(event)
+  if (event.type === &quot;result&quot;) appendToState(event)
+}
+</code></pre>
+<h2>5. Governance by results: the role of <code>maxResultSize</code></h2>
+<p>Excessive tool output is not an experience problem, but a system problem:</p>
+<ul>
+<li>Squeeze the context budget.</li>
+<li>Amplify compression frequencies.</li>
+<li>Added subsequent round distortion.</li>
+</ul>
+<p>因此结果大小治理要在工具层就执行，不应全部留给压缩层兜底。</p>
+<h2>6. Common faults</h2>
+<ul>
+<li>Missing contract field: The policy layer cannot determine.</li>
+<li>Writing tool concurrency: state conflict.</li>
+<li>No streaming events: a debugging black box.</li>
+</ul>
+<h2>7. Minimum implementable contract</h2>
+<pre><code class="language-typescript">type ToolContract = {
+  name: string
+  isReadOnly: boolean
+  isConcurrencySafe: boolean
+  maxResultSize?: number
+  inputSchema: JsonSchema
+  run(input: unknown): Promise&lt;ToolResult&gt;
+}
+</code></pre>
+<h2>8. 小结</h2>
+<p>The core value of the tool system is: <strong>Binding "what can be done" and "how it is allowed to be done" in the same contract. </strong></p>
+<h2>Next Read</h2>
+<ul>
+<li><code>context-budget-and-tool-result-storage</code></li>
+<li><code>permissions-runtime-evaluation</code></li>
+</ul></div>
+    <p class="footer">Source markdown: <code>contents/10-mechanism/tool-contract-and-dispatch-pipeline_EN.md</code></p>
+  </article>
+</div></div></main>
+</body>
+</html>

@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>证据模型：把代码事实与推断分离</title>
+  <link rel="stylesheet" href="../../assets/style.css" />
+  <script defer src="../../assets/site.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container site-header-inner">
+      <a class="brand" href="../index.html">Lessons from Claude Code</a>
+      <div class="controls">
+        <a class="toggle-btn" href="../../articles/evidence-model-and-claim-discipline.html">English</a>
+        <button id="theme-toggle" class="toggle-btn" type="button">Light</button>
+      </div>
+      <nav class="nav" aria-label="Main"><a class="" href="../index.html">首页</a><a class="active" href="../map.html">地图</a><a class="" href="../mechanism.html">机制</a><a class="" href="../decision.html">决策</a><a class="" href="../build.html">复建</a></nav>
+    </div>
+  </header>
+  <main class="main"><div class="container"><p class="lead"><a href="../map.html">返回 地图</a></p>
+<div class="article-layout">
+  <aside class="article-sidebar">
+  <h3>地图</h3>
+  <p class="lead"><a href="../map.html">返回 地图</a></p>
+  <h3>同轨文章</h3>
+  <nav class="sidebar-nav"><a class='' href='architecture-map.html'>架构地图：开发者如何阅读 Lessons from Claude Code V2</a><a class='active' href='evidence-model-and-claim-discipline.html'>证据模型：把代码事实与推断分离</a></nav>
+  <h3>前置阅读</h3>
+  <ul><li><a href='architecture-map.html'><code>architecture-map</code></a></li></ul>
+  <h3>代码锚点</h3>
+  <ul><li><code>claude-code-main/src/query.ts</code><br/><span class='lead'>budget checks, compaction calls</span></li><li><code>claude-code-main/src/utils/permissions/filesystem.ts</code><br/><span class='lead'>read/write permission order</span></li><li><code>claude-code-main/src/services/analytics/growthbook.ts</code><br/><span class='lead'>feature gate reads</span></li></ul>
+</aside>
+  <article class="article">
+    <h1>证据模型：把代码事实与推断分离</h1>
+    <p class="lead">定义 E1/E2/E3 三层证据等级，建立文章结论的可审计标准。</p>
+    <div class="meta">
+      <span class="badge">advanced</span>
+      <span class="badge">L1</span>
+      <span class="badge">E1</span>
+      <span class="badge">更新 2026-04-06</span>
+    </div>
+    <div class="meta"><span class='tag'>evidence</span><span class='tag'>methodology</span><span class='tag'>technical-writing</span></div>
+    <div class="article-body"><h1>证据模型：把代码事实与推断分离</h1>
+<blockquote>
+<p>这篇是整站的“防跑偏机制”。<br>
+没有证据级别，文章很容易从工程分析滑向“高质量主观感受”。</p>
+</blockquote>
+<h2>1. 为什么必须有证据模型</h2>
+<p>如果你在团队里做过技术评审，会发现一个常见现象：<br>
+同样一段代码，A 说“这里是稳定性设计”，B 说“这里只是历史包袱”。<br>
+争论本身没问题，问题是<strong>双方都拿不出可复查的证据链</strong>。</p>
+<p>因此我们把结论分层，不再用“语气强度”代表“事实强度”。</p>
+<h2>2. E1 / E2 / E3 的定义</h2>
+<h3>E1：直接代码证据</h3>
+<p>在同一个文件内可以直接看到行为依据。<br>
+例如：某个分支先判 deny，再判 allow。</p>
+<h3>E2：跨文件行为证据</h3>
+<p>单文件看不全，但通过调用链可以闭环验证。<br>
+例如：<code>query.ts</code> 触发压缩，<code>autoCompact.ts</code> 决定阈值和断路。</p>
+<h3>E3：带前提推断</h3>
+<p>代码没有直接表达，需要结合上下文推断。<br>
+此时必须写清前提和不确定性，不能伪装成事实。</p>
+<h2>3. 一个实际判定示例</h2>
+<p>假设我们要写结论：<br>
+“权限系统真正边界在判定顺序，不在 UI 弹窗。”</p>
+<p>可以这样落证据：</p>
+<pre><code class="language-text">E1: filesystem.ts 中 read/write 判定顺序是固定链条
+E2: permissionSetup.ts 对危险规则做前置拦截
+E3: 在团队默认配置下，这种顺序更适合共享工作区
+</code></pre>
+<p>这样写的好处是：读者能精确知道哪部分是事实、哪部分是判断。</p>
+<h2>4. 写作时的最小流程</h2>
+<p>每个关键结论都走四步：</p>
+<ol>
+<li>先找锚点文件。</li>
+<li>再写观察事实。</li>
+<li>再给证据等级。</li>
+<li>最后给设计解释。</li>
+</ol>
+<p>你会发现这和“先有观点再找证据”正好反过来。<br>
+这就是质量差异的来源。</p>
+<h2>5. 常见误用（也是最容易翻车的地方）</h2>
+<h3>误用 1：把 E3 写成 E1</h3>
+<p>典型句式：<br>
+“作者显然是想……”<br>
+这种句子如果没有注释或分支证据，就是推断，不是事实。</p>
+<h3>误用 2：只有模块名，没有定位</h3>
+<p>只写 “在权限模块里” 没意义。<br>
+至少要给路径级锚点，例如 <code>src/utils/permissions/filesystem.ts</code>。</p>
+<h3>误用 3：跨文件行为没闭环</h3>
+<p>只看到调用点，不看被调用实现，就急着下结论。<br>
+这会让 E2 退化成“猜测拼图”。</p>
+<h2>6. 为什么这套约束值回成本</h2>
+<p>证据标注会增加编辑成本，这是真的。<br>
+但它带来三个直接收益：</p>
+<ul>
+<li>团队讨论可回到同一组事实。</li>
+<li>新人接手时不需要猜作者意图。</li>
+<li>文章可以直接进入架构评审材料，而不是只能当博客看。</li>
+</ul>
+<h2>7. 一个建议的段落写法</h2>
+<p>你可以用这个固定句式：</p>
+<pre><code class="language-markdown">结论：……
+证据等级：E1/E2/E3
+代码锚点：……
+边界条件：……
+</code></pre>
+<p>用几次后，你会明显感觉文章质量更稳定。</p>
+<h2>8. 下一步</h2>
+<p>接下来先读 <code>runtime-entry-and-turn-lifecycle</code>。<br>
+那篇会直接演示：如何在机制文中把证据规则落到完整运行链路里。</p></div>
+    <p class="footer">Markdown 源文件： <code>contents/00-map/evidence-model-and-claim-discipline.md</code></p>
+  </article>
+</div></div></main>
+</body>
+</html>

@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Runtime decision chain of permission system</title>
+  <link rel="stylesheet" href="../assets/style.css" />
+  <script defer src="../assets/site.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container site-header-inner">
+      <a class="brand" href="../index.html">Lessons from Claude Code</a>
+      <div class="controls">
+        <a class="toggle-btn" href="../zh/articles/permissions-runtime-evaluation.html">中文</a>
+        <button id="theme-toggle" class="toggle-btn" type="button">Light</button>
+      </div>
+      <nav class="nav" aria-label="Main"><a class="" href="../index.html">Home</a><a class="" href="../map.html">Map</a><a class="active" href="../mechanism.html">Mechanism</a><a class="" href="../decision.html">Decision</a><a class="" href="../build.html">Build</a></nav>
+    </div>
+  </header>
+  <main class="main"><div class="container"><p class="lead"><a href="../mechanism.html">Back to Mechanism</a></p>
+<div class="article-layout">
+  <aside class="article-sidebar">
+  <h3>Mechanism</h3>
+  <p class="lead"><a href="../mechanism.html">Back to Mechanism</a></p>
+  <h3>Track Articles</h3>
+  <nav class="sidebar-nav"><a class='' href='runtime-entry-and-turn-lifecycle.html'>Runtime entry and Turn life cycle</a><a class='' href='query-loop-state-machine-and-continue-transitions.html'>Query Loop state machine and Continue migration</a><a class='' href='tool-contract-and-dispatch-pipeline.html'>Tool Contracts and Distribution Execution Pipelines</a><a class='' href='context-budget-and-tool-result-storage.html'>Contextual Budgeting and Tool Result Storage Governance</a><a class='active' href='permissions-runtime-evaluation.html'>Runtime decision chain of permission system</a><a class='' href='multi-stage-compaction-pipeline.html'>Multi-stage context compression pipeline</a></nav>
+  <h3>Prerequisites</h3>
+  <ul><li><a href='tool-contract-and-dispatch-pipeline.html'><code>tool-contract-and-dispatch-pipeline</code></a></li></ul>
+  <h3>Code Anchors</h3>
+  <ul><li><code>claude-code-main/src/utils/permissions/PermissionMode.ts</code><br/><span class='lead'>permission modes</span></li><li><code>claude-code-main/src/utils/permissions/filesystem.ts</code><br/><span class='lead'>read checks, write checks, order of evaluation</span></li><li><code>claude-code-main/src/utils/permissions/permissionSetup.ts</code><br/><span class='lead'>dangerous rule detection</span></li><li><code>claude-code-main/src/utils/bash/treeSitterAnalysis.ts</code><br/><span class='lead'>shell AST analysis</span></li></ul>
+</aside>
+  <article class="article">
+    <h1>Runtime decision chain of permission system</h1>
+    <p class="lead">Decompose the runtime security boundary from three layers: permission mode, rule priority, and shell security analysis.</p>
+    <div class="meta">
+      <span class="badge">advanced</span>
+      <span class="badge">L2</span>
+      <span class="badge">E1</span>
+      <span class="badge">Updated 2026-04-06</span>
+    </div>
+    <div class="meta"><span class='tag'>permissions</span><span class='tag'>policy</span><span class='tag'>security</span><span class='tag'>runtime-governance</span></div>
+    <div class="article-body"><h1>Runtime decision chain of permission system</h1>
+<blockquote>
+<p>The permission popup is just UI. The real security boundary is decision order and non-bypassable checks.</p>
+</blockquote>
+<h2>1. 核心问题</h2>
+<p>If you only do "whether to pop up a window", the system will repeatedly swing between ease of use and security.
+The mature approach is to design permissions as an auditable runtime decision chain.</p>
+<h2>2. Operation chain diagram</h2>
+<pre><code class="language-mermaid">flowchart TD
+  A[解析权限模式] --&gt; B[匹配 deny 规则]
+  B --&gt;|命中| X[拒绝]
+  B --&gt;|未命中| C[匹配 ask 规则]
+  C --&gt;|命中| D[请求确认]
+  D --&gt;|拒绝| X
+  D --&gt;|同意| E[附加安全检查]
+  C --&gt;|未命中| F[匹配 allow 规则]
+  F --&gt;|命中| E
+  F --&gt;|未命中| G[默认策略]
+  G --&gt; E
+  E --&gt;|通过| Y[允许执行]
+  E --&gt;|失败| X
+</code></pre>
+<h2>3. Pattern layer and execution layer</h2>
+<ul>
+<li><code>PermissionMode.ts</code>: Define mode entry (conservative/automatic, etc.).</li>
+<li><code>filesystem.ts</code>: Defines the read and write evaluation order.</li>
+<li><code>permissionSetup.ts</code>: Configure dangerous rules to intercept when loading.</li>
+<li><code>treeSitterAnalysis.ts</code>: Perform structured risk analysis on the shell.</li>
+</ul>
+<p>The pattern layer determines the "tendency", and the execution layer determines the "result".</p>
+<h2>4. Why write operations need to be stricter</h2>
+<p>Read failures are usually just insufficient information; write failures may be irreversible damage.
+Therefore, the write path should have additional checks and should not be treated with the same intensity as the read path.</p>
+<h2>5. Why can’t we just rely on regex to check commands?</h2>
+<p>Many dangerous commands are structural combination risks, not word hit risks.
+<code>tree-sitter</code>/AST analysis is more expensive but reduces miss detection rates.</p>
+<h2>6. Common faults</h2>
+<ul>
+<li>allow is earlier than deny, and the boundaries are reversed.</li>
+<li>Different surfaces (files/shells) use different orders.</li>
+<li>The log only shows results without hitting the path.</li>
+</ul>
+<h2>7. Actionable recommendations</h2>
+<ul>
+<li>Determine the curing sequence and test individually.</li>
+<li>Write and read tiering strategies.</li>
+<li>Add lint during the configuration loading phase.</li>
+<li>Permissions log records the complete hit chain.</li>
+</ul>
+<h2>8. Summary</h2>
+<p>The essence of the permission system is not "asking the user or not", but "whether it can stably give explainable decisions".</p>
+<h2>Next Read</h2>
+<ul>
+<li><code>why-permission-check-order-is-boundary</code></li>
+<li><code>build-a-safe-tool-runtime</code></li>
+</ul></div>
+    <p class="footer">Source markdown: <code>contents/10-mechanism/permissions-runtime-evaluation_EN.md</code></p>
+  </article>
+</div></div></main>
+</body>
+</html>

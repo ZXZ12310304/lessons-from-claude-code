@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>决策</title>
+  <link rel="stylesheet" href="../assets/style.css" />
+  <script defer src="../assets/site.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container site-header-inner">
+      <a class="brand" href="index.html">Lessons from Claude Code</a>
+      <div class="controls">
+        <a class="toggle-btn" href="../decision.html">English</a>
+        <button id="theme-toggle" class="toggle-btn" type="button">Light</button>
+      </div>
+      <nav class="nav" aria-label="Main"><a class="" href="index.html">首页</a><a class="" href="map.html">地图</a><a class="" href="mechanism.html">机制</a><a class="active" href="decision.html">决策</a><a class="" href="build.html">复建</a></nav>
+    </div>
+  </header>
+  <main class="main"><div class="container"><section class="hero">
+  <h1>决策</h1>
+  <p>为什么这样设计，以及关键权衡。</p>
+</section>
+<section class="section">
+  <div class="grid"><a class='card' href='articles/why-query-loop-owns-control-plane.html'><h3>为什么 Query Loop 必须承担控制平面</h3><p class='lead'>论证将重试、预算、工具回注与压缩协调集中在 query loop 是有意架构，而非坏味道。</p><div class='meta'><span class='badge'>L3</span><span class='badge'>E2</span></div><div class='meta'><span class='tag'>decision</span><span class='tag'>control-plane</span><span class='tag'>orchestration</span></div></a><a class='card' href='articles/why-permission-check-order-is-boundary.html'><h3>为什么权限判定顺序本身就是安全边界</h3><p class='lead'>说明 deny/ask/allow 的评估顺序为何比弹窗文案更关键，以及如何防止隐性提权。</p><div class='meta'><span class='badge'>L3</span><span class='badge'>E2</span></div><div class='meta'><span class='tag'>decision</span><span class='tag'>permissions</span><span class='tag'>security-boundary</span></div></a></div>
+</section></div></main>
+</body>
+</html>

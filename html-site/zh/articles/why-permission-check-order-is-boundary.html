@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>为什么权限判定顺序本身就是安全边界</title>
+  <link rel="stylesheet" href="../../assets/style.css" />
+  <script defer src="../../assets/site.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container site-header-inner">
+      <a class="brand" href="../index.html">Lessons from Claude Code</a>
+      <div class="controls">
+        <a class="toggle-btn" href="../../articles/why-permission-check-order-is-boundary.html">English</a>
+        <button id="theme-toggle" class="toggle-btn" type="button">Light</button>
+      </div>
+      <nav class="nav" aria-label="Main"><a class="" href="../index.html">首页</a><a class="" href="../map.html">地图</a><a class="" href="../mechanism.html">机制</a><a class="active" href="../decision.html">决策</a><a class="" href="../build.html">复建</a></nav>
+    </div>
+  </header>
+  <main class="main"><div class="container"><p class="lead"><a href="../decision.html">返回 决策</a></p>
+<div class="article-layout">
+  <aside class="article-sidebar">
+  <h3>决策</h3>
+  <p class="lead"><a href="../decision.html">返回 决策</a></p>
+  <h3>同轨文章</h3>
+  <nav class="sidebar-nav"><a class='' href='why-query-loop-owns-control-plane.html'>为什么 Query Loop 必须承担控制平面</a><a class='active' href='why-permission-check-order-is-boundary.html'>为什么权限判定顺序本身就是安全边界</a></nav>
+  <h3>前置阅读</h3>
+  <ul><li><a href='permissions-runtime-evaluation.html'><code>permissions-runtime-evaluation</code></a></li></ul>
+  <h3>代码锚点</h3>
+  <ul><li><code>claude-code-main/src/utils/permissions/filesystem.ts</code><br/><span class='lead'>read order, write order</span></li><li><code>claude-code-main/src/utils/permissions/permissionSetup.ts</code><br/><span class='lead'>unsafe rule lint</span></li></ul>
+</aside>
+  <article class="article">
+    <h1>为什么权限判定顺序本身就是安全边界</h1>
+    <p class="lead">说明 deny/ask/allow 的评估顺序为何比弹窗文案更关键，以及如何防止隐性提权。</p>
+    <div class="meta">
+      <span class="badge">advanced</span>
+      <span class="badge">L3</span>
+      <span class="badge">E2</span>
+      <span class="badge">更新 2026-04-06</span>
+    </div>
+    <div class="meta"><span class='tag'>decision</span><span class='tag'>permissions</span><span class='tag'>security-boundary</span></div>
+    <div class="article-body"><h1>为什么权限判定顺序本身就是安全边界</h1>
+<blockquote>
+<p>这篇不是“权限机制怎么写”，而是“为什么判定顺序就是边界本体”。<br>
+顺序错了，配置再多都可能是错位保护。</p>
+</blockquote>
+<h2>1. 从一个真实决策冲突出发</h2>
+<p>产品常会提出需求：<br>
+“把这个命令默认放行，别总弹窗了。”</p>
+<p>安全会提出反需求：<br>
+“这个命令必须先过 deny 规则，不能先看 allow。”</p>
+<p>这其实不是体验 vs 安全的简单冲突，而是“顺序是否可被破坏”的冲突。</p>
+<h2>2. 为什么顺序比规则数量更关键</h2>
+<p>假设你有 20 条规则，但顺序不稳定。<br>
+那系统就会在不同路径命中不同优先级，行为不可预测。</p>
+<p><code>claude-code-main/src/utils/permissions/filesystem.ts</code> 显示的核心思想是：<br>
+先定义顺序契约，再允许规则扩展。</p>
+<p>一个可靠链条通常是：</p>
+<pre><code class="language-text">hard deny -&gt; ask -&gt; explicit allow -&gt; implicit default
+</code></pre>
+<h2>3. 顺序就是“可证明性”</h2>
+<p>如果团队问：“为什么这次放行了？”<br>
+你需要能回答：</p>
+<ol>
+<li>命中了哪条规则。</li>
+<li>为什么前面的更强规则没有命中。</li>
+<li>最终决策是否经过附加安全检查。</li>
+</ol>
+<p>这三件事只有在顺序稳定时才可证明。</p>
+<h2>4. 为什么“用户点了同意”不能成为终局</h2>
+<p>很多实现会把用户确认视为最终裁决。<br>
+但生产系统里，用户确认应该是链条中的一个步骤，不是跳过链条的后门。</p>
+<p>尤其是写操作和 shell 执行，仍应受结构性安全检查约束。<br>
+否则会出现“用户误触 + 系统全放行”的组合风险。</p>
+<h2>5. 配置加载阶段的防线不能省</h2>
+<p><code>claude-code-main/src/utils/permissions/permissionSetup.ts</code> 体现了另一个关键决策：<br>
+危险规则要在加载时就被发现，而不是运行时碰运气。</p>
+<p>这类前置 lint 的价值是把风险提前，从执行风险变成配置风险。</p>
+<h2>6. 常见反模式</h2>
+<h3>反模式 A：按功能模块各自定义顺序</h3>
+<p>文件系统一套、shell 一套、MCP 一套。<br>
+最后用户和开发者都无法建立统一预期。</p>
+<h3>反模式 B：插入“特例捷径”</h3>
+<p>为了某个场景快速上线，在链条中插入一条“先 allow 再说”。<br>
+短期省事，长期是审计灾难。</p>
+<h3>反模式 C：日志只记结论不记路径</h3>
+<p>只记 <code>allowed=true</code>，不记命中规则链，复盘几乎无法进行。</p>
+<h2>7. 工程建议：把顺序当 API</h2>
+<p>一旦确定优先级顺序，就把它当公开契约：</p>
+<ul>
+<li>写测试保证顺序不回归。</li>
+<li>写文档说明每一层职责。</li>
+<li>写日志输出命中路径。</li>
+</ul>
+<p>这比“再加一层弹窗”更能提升真实安全性。</p>
+<h2>8. 小结</h2>
+<p>权限系统的“边界”不是某条规则，也不是某个按钮。<br>
+边界是规则运行的顺序与不可绕过性。</p>
+<h2>Next Read</h2>
+<ul>
+<li><code>build-a-safe-tool-runtime</code></li>
+</ul></div>
+    <p class="footer">Markdown 源文件： <code>contents/20-decision/why-permission-check-order-is-boundary.md</code></p>
+  </article>
+</div></div></main>
+</body>
+</html>

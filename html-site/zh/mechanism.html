@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>机制</title>
+  <link rel="stylesheet" href="../assets/style.css" />
+  <script defer src="../assets/site.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container site-header-inner">
+      <a class="brand" href="index.html">Lessons from Claude Code</a>
+      <div class="controls">
+        <a class="toggle-btn" href="../mechanism.html">English</a>
+        <button id="theme-toggle" class="toggle-btn" type="button">Light</button>
+      </div>
+      <nav class="nav" aria-label="Main"><a class="" href="index.html">首页</a><a class="" href="map.html">地图</a><a class="active" href="mechanism.html">机制</a><a class="" href="decision.html">决策</a><a class="" href="build.html">复建</a></nav>
+    </div>
+  </header>
+  <main class="main"><div class="container"><section class="hero">
+  <h1>机制</h1>
+  <p>运行时、工具、权限、压缩机制。</p>
+</section>
+<section class="section">
+  <div class="grid"><a class='card' href='articles/runtime-entry-and-turn-lifecycle.html'><h3>运行时入口与 Turn 生命周期</h3><p class='lead'>从 submitMessage 到回合提交，拆解一次用户输入如何进入主循环并落地为会话状态。</p><div class='meta'><span class='badge'>L2</span><span class='badge'>E1</span></div><div class='meta'><span class='tag'>runtime</span><span class='tag'>query-engine</span><span class='tag'>lifecycle</span></div></a><a class='card' href='articles/query-loop-state-machine-and-continue-transitions.html'><h3>Query Loop 状态机与 Continue 迁移</h3><p class='lead'>把 while 主循环还原成状态机，解释 continue 位点、退出条件与异常分支的设计。</p><div class='meta'><span class='badge'>L2</span><span class='badge'>E1</span></div><div class='meta'><span class='tag'>query-loop</span><span class='tag'>state-machine</span><span class='tag'>continuation</span></div></a><a class='card' href='articles/tool-contract-and-dispatch-pipeline.html'><h3>工具契约与分发执行管线</h3><p class='lead'>解释 Tool 不是函数列表，而是治理契约；并拆解工具分发、并发编排与流式执行路径。</p><div class='meta'><span class='badge'>L2</span><span class='badge'>E1</span></div><div class='meta'><span class='tag'>tool-system</span><span class='tag'>contract</span><span class='tag'>dispatch</span><span class='tag'>streaming</span></div></a><a class='card' href='articles/context-budget-and-tool-result-storage.html'><h3>上下文预算与工具结果存储治理</h3><p class='lead'>把预算检查、分阶段压缩和 tool result 落盘串成统一治理链，解决长会话失稳问题。</p><div class='meta'><span class='badge'>L2</span><span class='badge'>E1</span></div><div class='meta'><span class='tag'>context</span><span class='tag'>budget</span><span class='tag'>tool-result-storage</span><span class='tag'>long-session</span></div></a><a class='card' href='articles/permissions-runtime-evaluation.html'><h3>权限系统的运行时判定链</h3><p class='lead'>从权限模式、规则优先级、shell 安全分析三层拆解运行时安全边界。</p><div class='meta'><span class='badge'>L2</span><span class='badge'>E1</span></div><div class='meta'><span class='tag'>permissions</span><span class='tag'>policy</span><span class='tag'>security</span><span class='tag'>runtime-governance</span></div></a><a class='card' href='articles/multi-stage-compaction-pipeline.html'><h3>多阶段上下文压缩管线</h3><p class='lead'>拆解 snip、microcompact、autocompact 与 session memory compact 的触发顺序与断路机制。</p><div class='meta'><span class='badge'>L2</span><span class='badge'>E1</span></div><div class='meta'><span class='tag'>compaction</span><span class='tag'>context</span><span class='tag'>reliability</span><span class='tag'>circuit-breaker</span></div></a></div>
+</section></div></main>
+</body>
+</html>

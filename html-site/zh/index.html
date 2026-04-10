@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>首页</title>
+  <link rel="stylesheet" href="../assets/style.css" />
+  <script defer src="../assets/site.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container site-header-inner">
+      <a class="brand" href="index.html">Lessons from Claude Code</a>
+      <div class="controls">
+        <a class="toggle-btn" href="../index.html">English</a>
+        <button id="theme-toggle" class="toggle-btn" type="button">Light</button>
+      </div>
+      <nav class="nav" aria-label="Main"><a class="active" href="index.html">首页</a><a class="" href="map.html">地图</a><a class="" href="mechanism.html">机制</a><a class="" href="decision.html">决策</a><a class="" href="build.html">复建</a></nav>
+    </div>
+  </header>
+  <main class="main"><div class="container"><section class="hero">
+  <h1>Lessons from Claude Code</h1>
+  <p>面向开发者的架构分析站，网页由 markdown 自动生成。</p>
+</section>
+<section class="section">
+  <h2>阅读轨道</h2>
+  <div class="grid"><a class='card' href='map.html'><h3>地图</h3><p class='lead'>阅读路径、术语、证据规范。</p><div class='meta'><span class='badge'>2 篇</span></div></a><a class='card' href='mechanism.html'><h3>机制</h3><p class='lead'>运行时、工具、权限、压缩机制。</p><div class='meta'><span class='badge'>6 篇</span></div></a><a class='card' href='decision.html'><h3>决策</h3><p class='lead'>为什么这样设计，以及关键权衡。</p><div class='meta'><span class='badge'>2 篇</span></div></a><a class='card' href='build.html'><h3>复建</h3><p class='lead'>最小实现方案与工程清单。</p><div class='meta'><span class='badge'>2 篇</span></div></a></div>
+</section>
+<section class="section">
+  <h2>推荐先读</h2>
+  <div class="grid"><a class='card' href='articles/architecture-map.html'><h3>架构地图：开发者如何阅读 Lessons from Claude Code V2</h3><p class='lead'>从阅读路径、证据规范、章节依赖关系三个维度定义站点使用方式，避免“只看热闹不看机制”。</p><div class='meta'><span class='badge'>map</span><span class='badge'>intermediate</span></div></a><a class='card' href='articles/evidence-model-and-claim-discipline.html'><h3>证据模型：把代码事实与推断分离</h3><p class='lead'>定义 E1/E2/E3 三层证据等级，建立文章结论的可审计标准。</p><div class='meta'><span class='badge'>map</span><span class='badge'>advanced</span></div></a><a class='card' href='articles/runtime-entry-and-turn-lifecycle.html'><h3>运行时入口与 Turn 生命周期</h3><p class='lead'>从 submitMessage 到回合提交，拆解一次用户输入如何进入主循环并落地为会话状态。</p><div class='meta'><span class='badge'>mechanism</span><span class='badge'>advanced</span></div></a><a class='card' href='articles/query-loop-state-machine-and-continue-transitions.html'><h3>Query Loop 状态机与 Continue 迁移</h3><p class='lead'>把 while 主循环还原成状态机，解释 continue 位点、退出条件与异常分支的设计。</p><div class='meta'><span class='badge'>mechanism</span><span class='badge'>advanced</span></div></a></div>
+</section></div></main>
+</body>
+</html>

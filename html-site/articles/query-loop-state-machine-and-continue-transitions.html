@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Query Loop state machine and Continue migration</title>
+  <link rel="stylesheet" href="../assets/style.css" />
+  <script defer src="../assets/site.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container site-header-inner">
+      <a class="brand" href="../index.html">Lessons from Claude Code</a>
+      <div class="controls">
+        <a class="toggle-btn" href="../zh/articles/query-loop-state-machine-and-continue-transitions.html">中文</a>
+        <button id="theme-toggle" class="toggle-btn" type="button">Light</button>
+      </div>
+      <nav class="nav" aria-label="Main"><a class="" href="../index.html">Home</a><a class="" href="../map.html">Map</a><a class="active" href="../mechanism.html">Mechanism</a><a class="" href="../decision.html">Decision</a><a class="" href="../build.html">Build</a></nav>
+    </div>
+  </header>
+  <main class="main"><div class="container"><p class="lead"><a href="../mechanism.html">Back to Mechanism</a></p>
+<div class="article-layout">
+  <aside class="article-sidebar">
+  <h3>Mechanism</h3>
+  <p class="lead"><a href="../mechanism.html">Back to Mechanism</a></p>
+  <h3>Track Articles</h3>
+  <nav class="sidebar-nav"><a class='' href='runtime-entry-and-turn-lifecycle.html'>Runtime entry and Turn life cycle</a><a class='active' href='query-loop-state-machine-and-continue-transitions.html'>Query Loop state machine and Continue migration</a><a class='' href='tool-contract-and-dispatch-pipeline.html'>Tool Contracts and Distribution Execution Pipelines</a><a class='' href='context-budget-and-tool-result-storage.html'>Contextual Budgeting and Tool Result Storage Governance</a><a class='' href='permissions-runtime-evaluation.html'>Runtime decision chain of permission system</a><a class='' href='multi-stage-compaction-pipeline.html'>Multi-stage context compression pipeline</a></nav>
+  <h3>Prerequisites</h3>
+  <ul><li><a href='runtime-entry-and-turn-lifecycle.html'><code>runtime-entry-and-turn-lifecycle</code></a></li></ul>
+  <h3>Code Anchors</h3>
+  <ul><li><code>claude-code-main/src/query.ts</code><br/><span class='lead'>main loop, continue branches, exit checks</span></li><li><code>claude-code-main/src/query/retry.ts</code><br/><span class='lead'>retry policy</span></li></ul>
+</aside>
+  <article class="article">
+    <h1>Query Loop state machine and Continue migration</h1>
+    <p class="lead">Restore the while main loop into a state machine and explain the design of continue positions, exit conditions and exception branches.</p>
+    <div class="meta">
+      <span class="badge">advanced</span>
+      <span class="badge">L2</span>
+      <span class="badge">E1</span>
+      <span class="badge">Updated 2026-04-06</span>
+    </div>
+    <div class="meta"><span class='tag'>query-loop</span><span class='tag'>state-machine</span><span class='tag'>continuation</span></div>
+    <div class="article-body"><h1>Query Loop state machine and Continue migration</h1>
+<blockquote>
+<p>You can think of <code>query.ts</code> as an "interruptible, resumeable, state machine with tool branches".
+If you don’t understand the continue bit, you won’t understand why the system can continue to run in complex scenarios.</p>
+</blockquote>
+<h2>1. The real problem of the main loop is not "long", but "whether the migration is clear"</h2>
+<p>In engineering, people often say that a certain function is too long.
+But for the query loop, the real danger is:</p>
+<ul>
+<li>Migration points appear implicitly.</li>
+<li>Exit conditions are scattered across multiple branches.</li>
+<li>The retry path and the main path share state but are not clearly defined.</li>
+</ul>
+<p>This can lead to behavior that is sometimes right and sometimes wrong.</p>
+<h2>2. Minimal skeleton from the perspective of state machine</h2>
+<p>Abstract the implementation into four types of states:</p>
+<pre><code class="language-text">S0: 组装上下文
+S1: 请求模型一步
+S2: 工具执行与回注
+S3: 终止与提交
+</code></pre>
+<p>Migration relationship:</p>
+<pre><code class="language-mermaid">flowchart TD
+  S0[?????] --&gt; S1[????]
+  S1 --&gt;|tool_use| S2[???????]
+  S2 --&gt;|next_turn| S1
+  S1 --&gt;|stop| S3[?????]
+  S1 --&gt;|retry| R[????]
+  R --&gt; S1
+</code></pre>
+<p><code>continue</code> 不是“再来一次”，而是“沿着定义好的迁移边回到指定状态”。</p>
+<h2>3. What characteristics should the continue position in the code have?</h2>
+<p>In <code>claude-code-main/src/query.ts</code>, each continue position shall satisfy:</p>
+<ol>
+<li>Clearly write out trigger conditions.</li>
+<li>Clearly write out the status fields that will be carried over to the next round.</li>
+<li>Clearly write out whether it affects the budget, retry count, and round count.</li>
+</ol>
+<p>If you just write <code>continue</code> without updating the state, what you get is not a loop, but undefined behavior.</p>
+<h2>4. Exit conditions must be centralized and not dispersed</h2>
+<p>Most common bad taste: Each branch has its own "I think it's time to wrap up."
+The long-term result is that different paths have different termination semantics and users experience inconsistent behavior.</p>
+<p>Recommended practices:</p>
+<ul>
+<li>Allow branches to update state inside the loop.</li>
+<li>But eventually the exit decision converges to a single point check.</li>
+</ul>
+<p>Pseudocode example:</p>
+<pre><code class="language-typescript">if (shouldStop(state, modelStep, toolResult)) {
+  return finalize(state)
+}
+continue
+</code></pre>
+<h2>5. How to avoid "status double writing" in the retry path</h2>
+<p>The corresponding question for <code>claude-code-main/src/query/retry.ts</code> is:
+When an error occurs, whether to "rerun the current round" or "start a new round".</p>
+<p>The correct strategy is:</p>
+<ul>
+<li>The error occurred within the round: rerun the round and reuse the state.</li>
+<li>Error occurred after submission: handled in new turn.</li>
+</ul>
+<p>Otherwise you will get duplicate messages or missing messages.</p>
+<h2>6. Typical faults: infinite continuation and false exit</h2>
+<h3>Continue indefinitely</h3>
+<p>The continue condition is too wide + the exit condition is too weak, which will cause the system to keep "thinking one more step".
+The surface manifestation is that the token continues to grow, and users cannot see convergence.</p>
+<h3>fake exit</h3>
+<p>The branch returns early, but the critical state is not committed.
+The superficial performance is that "the interface looks finished", but the context does not match after restoration.</p>
+<h2>7. A design checklist you can reuse directly</h2>
+<ul>
+<li>Write the state transition diagram first, then write the code.</li>
+<li>Define a state snapshot structure for each continue point.</li>
+<li>Keep a uniform <code>shouldStop</code>.</li>
+<li>Add an iteration limit and exception logging to loop.</li>
+</ul>
+<p>These four items are enough to turn most "circular metaphysics problems" into debuggable problems.</p>
+<h2>8. Summary</h2>
+<p>The core of this article is not "how to write a loop", but "how to migrate states".
+When migration rules are clear, complexity increases but uncontrollability decreases.</p>
+<h2>Next Read</h2>
+<ul>
+<li><code>tool-contract-and-dispatch-pipeline</code></li>
+<li><code>multi-stage-compaction-pipeline</code></li>
+</ul></div>
+    <p class="footer">Source markdown: <code>contents/10-mechanism/query-loop-state-machine-and-continue-transitions_EN.md</code></p>
+  </article>
+</div></div></main>
+</body>
+</html>

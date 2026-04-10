@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Why is the order of permission determination itself a security boundary?</title>
+  <link rel="stylesheet" href="../assets/style.css" />
+  <script defer src="../assets/site.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container site-header-inner">
+      <a class="brand" href="../index.html">Lessons from Claude Code</a>
+      <div class="controls">
+        <a class="toggle-btn" href="../zh/articles/why-permission-check-order-is-boundary.html">中文</a>
+        <button id="theme-toggle" class="toggle-btn" type="button">Light</button>
+      </div>
+      <nav class="nav" aria-label="Main"><a class="" href="../index.html">Home</a><a class="" href="../map.html">Map</a><a class="" href="../mechanism.html">Mechanism</a><a class="active" href="../decision.html">Decision</a><a class="" href="../build.html">Build</a></nav>
+    </div>
+  </header>
+  <main class="main"><div class="container"><p class="lead"><a href="../decision.html">Back to Decision</a></p>
+<div class="article-layout">
+  <aside class="article-sidebar">
+  <h3>Decision</h3>
+  <p class="lead"><a href="../decision.html">Back to Decision</a></p>
+  <h3>Track Articles</h3>
+  <nav class="sidebar-nav"><a class='' href='why-query-loop-owns-control-plane.html'>Why Query Loop must assume control plane</a><a class='active' href='why-permission-check-order-is-boundary.html'>Why is the order of permission determination itself a security boundary?</a></nav>
+  <h3>Prerequisites</h3>
+  <ul><li><a href='permissions-runtime-evaluation.html'><code>permissions-runtime-evaluation</code></a></li></ul>
+  <h3>Code Anchors</h3>
+  <ul><li><code>claude-code-main/src/utils/permissions/filesystem.ts</code><br/><span class='lead'>read order, write order</span></li><li><code>claude-code-main/src/utils/permissions/permissionSetup.ts</code><br/><span class='lead'>unsafe rule lint</span></li></ul>
+</aside>
+  <article class="article">
+    <h1>Why is the order of permission determination itself a security boundary?</h1>
+    <p class="lead">Explain why the evaluation order of deny/ask/allow is more critical than the pop-up copy, and how to prevent implicit privilege escalation.</p>
+    <div class="meta">
+      <span class="badge">advanced</span>
+      <span class="badge">L3</span>
+      <span class="badge">E2</span>
+      <span class="badge">Updated 2026-04-06</span>
+    </div>
+    <div class="meta"><span class='tag'>decision</span><span class='tag'>permissions</span><span class='tag'>security-boundary</span></div>
+    <div class="article-body"><h1>Why is the order of permission determination itself a security boundary?</h1>
+<blockquote>
+<p>This article is not "how to write the permission mechanism", but "why the judgment order is the boundary ontology".
+If the order is wrong, no matter how many configurations are configured, it may be misaligned protection.</p>
+</blockquote>
+<h2>1. Start with a real decision conflict</h2>
+<p>Products often ask for:
+"Enable this command by default and stop popping up windows all the time."</p>
+<p>Security will make counter-requirements:
+"This command must pass the deny rule first and cannot first look at the allow rule."</p>
+<p>This is actually not a simple conflict between experience vs. safety, but a conflict over "whether the order can be destroyed."</p>
+<h2>2. Why order is more critical than the number of rules</h2>
+<p>Let's say you have 20 rules, but the order isn't stable.
+Then the system will hit different priorities on different paths, and the behavior will be unpredictable.</p>
+<p>The core idea displayed by <code>claude-code-main/src/utils/permissions/filesystem.ts</code> is:
+Define the sequential contract first, then allow the rules to be extended.</p>
+<p>A reliable chain is usually:</p>
+<pre><code class="language-text">hard deny -&gt; ask -&gt; explicit allow -&gt; implicit default
+</code></pre>
+<h2>3. Sequence is “provability”</h2>
+<p>If the team asks, “Why was it released this time?”
+You need to be able to answer:</p>
+<ol>
+<li>Which rule was hit.</li>
+<li>Why the previous stronger rule didn't hit.</li>
+<li>The final decision is subject to additional security checks.</li>
+</ol>
+<p>These three things can only be proven if the order is stable.</p>
+<h2>4. Why “the user clicks to agree” cannot be the final outcome</h2>
+<p>Many implementations treat user confirmation as final.
+But in a production system, user confirmation should be a step in the chain, not a backdoor to skip the chain.</p>
+<p>In particular, write operations and shell execution should still be subject to structural security checks.
+Otherwise, there will be a combined risk of "user accidental touch + full system release".</p>
+<h2>5. The defense line during the configuration loading phase cannot be omitted.</h2>
+<p><code>claude-code-main/src/utils/permissions/permissionSetup.ts</code> reflects another key decision:
+Dangerous rules need to be discovered at load time, rather than left to chance at run time.</p>
+<p>The value of this type of pre-lint is to advance the risk from execution risk to configuration risk.</p>
+<h2>6. Common anti-patterns</h2>
+<h3>Anti-pattern A: According to the order of definition of functional modules</h3>
+<p>One file system, one shell, and one MCP.
+In the end, neither users nor developers can establish unified expectations.</p>
+<h3>Anti-Pattern B: Inserting "Special Case Shortcuts"</h3>
+<p>In order to quickly go online for a certain scene, insert an "allow first and then talk" in the chain.
+It saves trouble in the short term, but is an audit disaster in the long term.</p>
+<h3>Anti-pattern C: The log only records the conclusion but not the path</h3>
+<p>Only remembering <code>allowed=true</code> but not the hit rule chain makes review almost impossible.</p>
+<h2>7. Engineering advice: treat order as API</h2>
+<p>Once the priority order is determined, treat it as a public contract:</p>
+<ul>
+<li>Write tests to ensure that the order does not regress.</li>
+<li>Write documents describing the responsibilities of each layer.</li>
+<li>Write log output hit path.</li>
+</ul>
+<p>This improves real security more than "adding another layer of pop-ups".</p>
+<h2>8. Summary</h2>
+<p>The "boundary" of the permission system is not a rule or a button.
+Boundaries are the order in which rules run and their non-bypassability.</p>
+<h2>Next Read</h2>
+<ul>
+<li><code>build-a-safe-tool-runtime</code></li>
+</ul></div>
+    <p class="footer">Source markdown: <code>contents/20-decision/why-permission-check-order-is-boundary_EN.md</code></p>
+  </article>
+</div></div></main>
+</body>
+</html>

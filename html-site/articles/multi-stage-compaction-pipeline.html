@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Multi-stage context compression pipeline</title>
+  <link rel="stylesheet" href="../assets/style.css" />
+  <script defer src="../assets/site.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container site-header-inner">
+      <a class="brand" href="../index.html">Lessons from Claude Code</a>
+      <div class="controls">
+        <a class="toggle-btn" href="../zh/articles/multi-stage-compaction-pipeline.html">中文</a>
+        <button id="theme-toggle" class="toggle-btn" type="button">Light</button>
+      </div>
+      <nav class="nav" aria-label="Main"><a class="" href="../index.html">Home</a><a class="" href="../map.html">Map</a><a class="active" href="../mechanism.html">Mechanism</a><a class="" href="../decision.html">Decision</a><a class="" href="../build.html">Build</a></nav>
+    </div>
+  </header>
+  <main class="main"><div class="container"><p class="lead"><a href="../mechanism.html">Back to Mechanism</a></p>
+<div class="article-layout">
+  <aside class="article-sidebar">
+  <h3>Mechanism</h3>
+  <p class="lead"><a href="../mechanism.html">Back to Mechanism</a></p>
+  <h3>Track Articles</h3>
+  <nav class="sidebar-nav"><a class='' href='runtime-entry-and-turn-lifecycle.html'>Runtime entry and Turn life cycle</a><a class='' href='query-loop-state-machine-and-continue-transitions.html'>Query Loop state machine and Continue migration</a><a class='' href='tool-contract-and-dispatch-pipeline.html'>Tool Contracts and Distribution Execution Pipelines</a><a class='' href='context-budget-and-tool-result-storage.html'>Contextual Budgeting and Tool Result Storage Governance</a><a class='' href='permissions-runtime-evaluation.html'>Runtime decision chain of permission system</a><a class='active' href='multi-stage-compaction-pipeline.html'>Multi-stage context compression pipeline</a></nav>
+  <h3>Prerequisites</h3>
+  <ul><li><a href='context-budget-and-tool-result-storage.html'><code>context-budget-and-tool-result-storage</code></a></li></ul>
+  <h3>Code Anchors</h3>
+  <ul><li><code>claude-code-main/src/query.ts</code><br/><span class='lead'>snip, microcompact, autocompact call order</span></li><li><code>claude-code-main/src/services/compact/autoCompact.ts</code><br/><span class='lead'>threshold, failure breaker</span></li><li><code>claude-code-main/src/services/compact/compact.ts</code><br/><span class='lead'>compaction flow</span></li><li><code>claude-code-main/src/services/compact/sessionMemoryCompact.ts</code><br/><span class='lead'>session memory branch</span></li></ul>
+</aside>
+  <article class="article">
+    <h1>Multi-stage context compression pipeline</h1>
+    <p class="lead">Disassemble the trigger sequence and circuit breaking mechanism of snip, microcompact, autocompact and session memory compact.</p>
+    <div class="meta">
+      <span class="badge">advanced</span>
+      <span class="badge">L2</span>
+      <span class="badge">E1</span>
+      <span class="badge">Updated 2026-04-06</span>
+    </div>
+    <div class="meta"><span class='tag'>compaction</span><span class='tag'>context</span><span class='tag'>reliability</span><span class='tag'>circuit-breaker</span></div>
+    <div class="article-body"><h1>Multi-stage context compression pipeline</h1>
+<blockquote>
+<p>"Compression" sounds like an action, but in a production system it is actually a continuous control chain.
+This chain handles not only the number of tokens, but also failure recovery and semantic fidelity.</p>
+</blockquote>
+<h2>1. Why single-step compression will definitely hit a wall</h2>
+<p>Many first version implementations were:</p>
+<pre><code class="language-python">if tokens &gt; threshold:
+    messages = summarize(messages)
+</code></pre>
+<p>This may work in short sessions, but in tool-intensive long sessions you will encounter two problems:</p>
+<ul>
+<li>The compression force is too weak: it cannot be compressed.</li>
+<li>Compression is too strong: key information is obliterated.</li>
+</ul>
+<p>So it must be done in stages rather than in a single stage.</p>
+<h2>2. View the compression chain in the source code</h2>
+<p>From <code>claude-code-main/src/query.ts</code> to <code>services/compact/*</code>, you can see clear layering:</p>
+<ol>
+<li><code>snip</code>: Low-cost cutting, giving priority to preserving the structure.</li>
+<li><code>microcompact</code>: Medium intensity compression, handling local expansion.</li>
+<li><code>autocompact</code>: Automatic compression at high pressure threshold.</li>
+<li><code>sessionMemoryCompact</code>: Specialized paths for session memory boundaries.</li>
+</ol>
+<p>These four layers correspond to four pressure states, rather than "four parameters of the same function".</p>
+<h2>3. Why is a circuit breaker necessary?</h2>
+<p>The circuit breaking logic of <code>claude-code-main/src/services/compact/autoCompact.ts</code> solves a real risk:
+Compression itself will also fail. If you blindly retry after failure, the system will enter a compression storm.</p>
+<p>Indicate:</p>
+<pre><code class="language-text">超压 -&gt; 压缩失败 -&gt; 继续超压 -&gt; 再压缩失败 -&gt; ...
+</code></pre>
+<p>Without circuit breakers, the chain will not naturally converge.</p>
+<h2>4. Successful compression does not mean that the system is usable</h2>
+<p>This is something that is easily overlooked.
+Successful compression only indicates that the token has declined, but does not indicate that the status is available.</p>
+<p>What really needs to be confirmed is:</p>
+<ul>
+<li>Is the mission objective still clear?</li>
+<li>Whether tool result references are still traceable.</li>
+<li>Can we still make the right decision in the next round?</li>
+</ul>
+<p>If these are not maintained, the system is only "alive", not "working".</p>
+<h2>5. The meaning of session memory branch</h2>
+<p><code>sessionMemoryCompact.ts</code> represents a critical engineering judgment:
+Conversation memories and ordinary messages cannot be handled exactly the same way.</p>
+<p>The reason is simple:</p>
+<ul>
+<li>Conversational memory contains cross-turn decision cues.</li>
+<li>Once these cues are lost, subsequent behavior can appear "suddenly stupid."</li>
+</ul>
+<p>Therefore, separate branches do not complicate things, but preserve boundaries.</p>
+<h2>6. An executable compression governance recommendation</h2>
+<p>You can land in this order:</p>
+<ol>
+<li>First add the import budget check.</li>
+<li>Add <code>snip</code> + <code>microcompact</code>.</li>
+<li>Add <code>autocompact</code> and the break count.</li>
+<li>Finally, we will deal with the session memory special strategy.</li>
+</ol>
+<p>Don't do it the other way around. Make the basic layer stable first, and then build the advanced layer.</p>
+<h2>7. Common accident signals</h2>
+<p>If more than two of the following signals appear, it is time to check the compression pipeline:</p>
+<ul>
+<li>The number of compression triggers in a single round increased abnormally.</li>
+<li>The tool retry rate increased significantly after compression.</li>
+<li>Response consistency dropped significantly in the second half of the session.</li>
+</ul>
+<p>These are often not model degradations, but compression strategy mismatches.</p>
+<h2>8. Summary</h2>
+<p>The core of multi-stage compression is not "smarter summarization", but:
+<strong>Upgrade contextual pressure control from a one-time operation to a manageable process. </strong></p>
+<h2>Next Read</h2>
+<ul>
+<li><code>why-query-loop-owns-control-plane</code></li>
+<li><code>build-a-minimal-query-loop</code></li>
+</ul></div>
+    <p class="footer">Source markdown: <code>contents/10-mechanism/multi-stage-compaction-pipeline_EN.md</code></p>
+  </article>
+</div></div></main>
+</body>
+</html>

@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Evidence model: Separating code facts from inference</title>
+  <link rel="stylesheet" href="../assets/style.css" />
+  <script defer src="../assets/site.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container site-header-inner">
+      <a class="brand" href="../index.html">Lessons from Claude Code</a>
+      <div class="controls">
+        <a class="toggle-btn" href="../zh/articles/evidence-model-and-claim-discipline.html">中文</a>
+        <button id="theme-toggle" class="toggle-btn" type="button">Light</button>
+      </div>
+      <nav class="nav" aria-label="Main"><a class="" href="../index.html">Home</a><a class="active" href="../map.html">Map</a><a class="" href="../mechanism.html">Mechanism</a><a class="" href="../decision.html">Decision</a><a class="" href="../build.html">Build</a></nav>
+    </div>
+  </header>
+  <main class="main"><div class="container"><p class="lead"><a href="../map.html">Back to Map</a></p>
+<div class="article-layout">
+  <aside class="article-sidebar">
+  <h3>Map</h3>
+  <p class="lead"><a href="../map.html">Back to Map</a></p>
+  <h3>Track Articles</h3>
+  <nav class="sidebar-nav"><a class='' href='architecture-map.html'>Architecture Maps: How Developers Read Lessons from Claude Code V2</a><a class='active' href='evidence-model-and-claim-discipline.html'>Evidence model: Separating code facts from inference</a></nav>
+  <h3>Prerequisites</h3>
+  <ul><li><a href='architecture-map.html'><code>architecture-map</code></a></li></ul>
+  <h3>Code Anchors</h3>
+  <ul><li><code>claude-code-main/src/query.ts</code><br/><span class='lead'>budget checks, compaction calls</span></li><li><code>claude-code-main/src/utils/permissions/filesystem.ts</code><br/><span class='lead'>read/write permission order</span></li><li><code>claude-code-main/src/services/analytics/growthbook.ts</code><br/><span class='lead'>feature gate reads</span></li></ul>
+</aside>
+  <article class="article">
+    <h1>Evidence model: Separating code facts from inference</h1>
+    <p class="lead">Define the three levels of evidence E1/E2/E3 and establish auditable standards for the conclusion of the article.</p>
+    <div class="meta">
+      <span class="badge">advanced</span>
+      <span class="badge">L1</span>
+      <span class="badge">E1</span>
+      <span class="badge">Updated 2026-04-06</span>
+    </div>
+    <div class="meta"><span class='tag'>evidence</span><span class='tag'>methodology</span><span class='tag'>technical-writing</span></div>
+    <div class="article-body"><h1>Evidence model: Separating code facts from inference</h1>
+<blockquote>
+<p>This article is the "anti-deviation mechanism" of the entire site.
+Without the level of evidence, the article can easily slide from engineering analysis to "high quality subjective feelings".</p>
+</blockquote>
+<h2>1. Why an evidence model is necessary</h2>
+<p>If you have done a technical review in your team, you will find a common phenomenon:
+For the same piece of code, A says "This is a stability design" and B says "This is just historical baggage".
+There is nothing wrong with the argument itself, but the problem is that neither side can produce a re-examineable chain of evidence.</p>
+<p>Therefore, we hierarchize the conclusions and no longer use “tone strength” to represent “fact strength”.</p>
+<h2>2. Definition of E1 / E2 / E3</h2>
+<h3>E1: Direct code evidence</h3>
+<p>The basis for the behavior can be seen directly in the same file.
+For example: a branch is judged to deny first and then to allow.</p>
+<h3>E2: Evidence of cross-file behavior</h3>
+<p>The entire file cannot be viewed in a single file, but it can be verified in a closed loop through the call chain.
+For example: <code>query.ts</code> triggers compression, <code>autoCompact.ts</code> determines thresholds and circuit breaking.</p>
+<h3>E3: Inference with premises</h3>
+<p>The code is not directly expressed and needs to be inferred based on context.
+At this time, the premises and uncertainties must be written clearly and cannot be disguised as facts.</p>
+<h2>3. An actual judgment example</h2>
+<p>Suppose we want to write the conclusion:
+"The real boundary of the permission system lies in the order of determination, not in the UI pop-up window."</p>
+<p>You can put the evidence like this:</p>
+<pre><code class="language-text">E1: filesystem.ts 中 read/write 判定顺序是固定链条
+E2: permissionSetup.ts 对危险规则做前置拦截
+E3: 在团队默认配置下，这种顺序更适合共享工作区
+</code></pre>
+<p>The advantage of writing this way is that readers can accurately know which part is fact and which part is judgment.</p>
+<h2>4. Minimum process when writing</h2>
+<p>Each key conclusion goes through four steps:</p>
+<ol>
+<li>Find the anchor file first.</li>
+<li>Then write down the observed facts.</li>
+<li>Then give the level of evidence.</li>
+<li>Finally, give an explanation of the design.</li>
+</ol>
+<p>You will find that this is exactly the opposite of "have an opinion first and then look for evidence."
+This is where the difference in quality comes from.</p>
+<h2>5. Common misuse (also the easiest place to overturn)</h2>
+<h3>Misuse 1: Write E3 as E1</h3>
+<p>Typical sentence patterns:
+"The author obviously wants to..."
+If such a sentence has no annotation or branching evidence, it is an inference, not a fact.</p>
+<h3>Misuse 2: Only module name, no positioning</h3>
+<p>Just writing "in the permission module" makes no sense.
+At least give it a path-level anchor, such as <code>src/utils/permissions/filesystem.ts</code>.</p>
+<h3>Misuse 3: Cross-file behavior does not close the loop</h3>
+<p>Only seeing the call point without looking at the called implementation makes us rush to conclusions.
+This reduces E2 to a "guessing puzzle".</p>
+<h2>6. Why is this set of constraints worth the cost?</h2>
+<p>It’s true that evidence annotation increases editing costs.
+But it brings three direct benefits:</p>
+<ul>
+<li>Team discussions can come back to the same set of facts.</li>
+<li>Newcomers don’t need to guess at authorial intent when they take over.</li>
+<li>Articles can go directly into the architecture review materials instead of being read as blogs only.</li>
+</ul>
+<h2>7. A suggested way to write a paragraph</h2>
+<p>You can use this fixed sentence pattern:</p>
+<pre><code class="language-markdown">结论：……
+证据等级：E1/E2/E3
+代码锚点：……
+边界条件：……
+</code></pre>
+<p>After using it a few times, you will obviously feel that the quality of the article is more stable.</p>
+<h2>8. Next step</h2>
+<p>Read <code>runtime-entry-and-turn-lifecycle</code> first.
+That article will directly demonstrate how to incorporate the evidence rules into a complete operational link in the mechanism text.</p></div>
+    <p class="footer">Source markdown: <code>contents/00-map/evidence-model-and-claim-discipline_EN.md</code></p>
+  </article>
+</div></div></main>
+</body>
+</html>

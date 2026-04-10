@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>上下文预算与工具结果存储治理</title>
+  <link rel="stylesheet" href="../../assets/style.css" />
+  <script defer src="../../assets/site.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container site-header-inner">
+      <a class="brand" href="../index.html">Lessons from Claude Code</a>
+      <div class="controls">
+        <a class="toggle-btn" href="../../articles/context-budget-and-tool-result-storage.html">English</a>
+        <button id="theme-toggle" class="toggle-btn" type="button">Light</button>
+      </div>
+      <nav class="nav" aria-label="Main"><a class="" href="../index.html">首页</a><a class="" href="../map.html">地图</a><a class="active" href="../mechanism.html">机制</a><a class="" href="../decision.html">决策</a><a class="" href="../build.html">复建</a></nav>
+    </div>
+  </header>
+  <main class="main"><div class="container"><p class="lead"><a href="../mechanism.html">返回 机制</a></p>
+<div class="article-layout">
+  <aside class="article-sidebar">
+  <h3>机制</h3>
+  <p class="lead"><a href="../mechanism.html">返回 机制</a></p>
+  <h3>同轨文章</h3>
+  <nav class="sidebar-nav"><a class='' href='runtime-entry-and-turn-lifecycle.html'>运行时入口与 Turn 生命周期</a><a class='' href='query-loop-state-machine-and-continue-transitions.html'>Query Loop 状态机与 Continue 迁移</a><a class='' href='tool-contract-and-dispatch-pipeline.html'>工具契约与分发执行管线</a><a class='active' href='context-budget-and-tool-result-storage.html'>上下文预算与工具结果存储治理</a><a class='' href='permissions-runtime-evaluation.html'>权限系统的运行时判定链</a><a class='' href='multi-stage-compaction-pipeline.html'>多阶段上下文压缩管线</a></nav>
+  <h3>前置阅读</h3>
+  <ul><li><a href='tool-contract-and-dispatch-pipeline.html'><code>tool-contract-and-dispatch-pipeline</code></a></li></ul>
+  <h3>代码锚点</h3>
+  <ul><li><code>claude-code-main/src/query.ts</code><br/><span class='lead'>token budget checks, snip, microcompact, autocompact</span></li><li><code>claude-code-main/src/utils/toolResultStorage.ts</code><br/><span class='lead'>disk offload, threshold logic</span></li><li><code>claude-code-main/src/services/analytics/growthbook.ts</code><br/><span class='lead'>feature-value overrides</span></li></ul>
+</aside>
+  <article class="article">
+    <h1>上下文预算与工具结果存储治理</h1>
+    <p class="lead">把预算检查、分阶段压缩和 tool result 落盘串成统一治理链，解决长会话失稳问题。</p>
+    <div class="meta">
+      <span class="badge">advanced</span>
+      <span class="badge">L2</span>
+      <span class="badge">E1</span>
+      <span class="badge">更新 2026-04-06</span>
+    </div>
+    <div class="meta"><span class='tag'>context</span><span class='tag'>budget</span><span class='tag'>tool-result-storage</span><span class='tag'>long-session</span></div>
+    <div class="article-body"><h1>上下文预算与工具结果存储治理</h1>
+<blockquote>
+<p>长会话系统里，“记住多少”不是能力问题，是预算问题。<br>
+预算治理做不好，模型再强也会在第 N 轮变钝、变乱、变贵。</p>
+</blockquote>
+<h2>1. 一个常见误解：预算只等于 token 上限</h2>
+<p>很多实现把预算理解为一个数字阈值，比如“超过 120k 就压缩”。<br>
+实际工程里预算至少有三层：</p>
+<ul>
+<li>模型上下文预算（prompt + history + tool result）。</li>
+<li>响应预算（本轮最多输出多少）。</li>
+<li>系统预算（压缩和回读本身也有成本）。</li>
+</ul>
+<p><code>claude-code-main/src/query.ts</code> 的设计重点不是“有没有阈值”，而是“是否前置、是否分层、是否可恢复”。</p>
+<h2>2. 预算检查为什么要放在回合入口</h2>
+<p>如果预算检查放在模型调用后，代价是：</p>
+<ul>
+<li>你已经花了调用成本。</li>
+<li>你拿到的结果可能基于失真上下文。</li>
+<li>你只能做被动补救。</li>
+</ul>
+<p>所以正确顺序是：</p>
+<pre><code class="language-text">预算评估 -&gt; 轻量裁剪 -&gt; 压缩升级 -&gt; 模型调用
+</code></pre>
+<p>而不是“先调模型，超了再说”。</p>
+<h2>3. 结果外置：<code>toolResultStorage</code> 的真实作用</h2>
+<p><code>claude-code-main/src/utils/toolResultStorage.ts</code> 不是缓存工具，它是预算安全阀。<br>
+当工具输出过大时，系统选择：</p>
+<ol>
+<li>把结果落盘（或外置存储）。</li>
+<li>在消息里保留引用句柄。</li>
+<li>下一轮按需回读。</li>
+</ol>
+<p>这种模式把“超大输出”从主上下文移出去，避免把整个会话挤爆。</p>
+<h2>4. 触发阈值可以动态，但必须可观测</h2>
+<p><code>claude-code-main/src/services/analytics/growthbook.ts</code> 提供了动态开关能力。<br>
+它允许你在线调整阈值策略，但同时带来一个新风险：<br>
+“今天和昨天行为不同，却没人知道为什么”。</p>
+<p>因此必须配套记录：</p>
+<ul>
+<li>当前阈值来源（默认值/实验值）。</li>
+<li>触发压缩或外置的具体原因。</li>
+<li>触发后释放/消耗了多少预算。</li>
+</ul>
+<h2>5. 运行链示意</h2>
+<pre><code class="language-mermaid">flowchart TD
+  A[回合开始] --&gt; B[预算评估]
+  B --&gt; C{是否超压}
+  C -- 否 --&gt; D[正常调用模型]
+  C -- 是 --&gt; E[snip/microcompact]
+  E --&gt; F{仍超压?}
+  F -- 否 --&gt; D
+  F -- 是 --&gt; G[tool result 外置]
+  G --&gt; H[保留引用并继续]
+</code></pre>
+<h2>6. 两类失败模式最致命</h2>
+<h3>失败模式 A：引用句柄失效</h3>
+<p>结果外置后，如果句柄不稳定或生命周期管理失败，系统会出现“知道有历史，但读不到历史”。</p>
+<h3>失败模式 B：压缩成功但语义损失过大</h3>
+<p>回合能继续，不代表质量可用。<br>
+如果压缩把决策上下文裁掉了，后续行为会明显退化。</p>
+<h2>7. 复建建议：先保证可恢复，再优化保真</h2>
+<p>一个实用顺序：</p>
+<ol>
+<li>先保证预算不爆（稳定性优先）。</li>
+<li>再保证引用可回读（恢复优先）。</li>
+<li>最后调优压缩策略（质量优先）。</li>
+</ol>
+<p>这是“先活下来，再活得好”。</p>
+<h2>8. 小结</h2>
+<p>预算治理不是单点功能，而是一条跨模块控制链。<br>
+你要看的不是“压缩函数写得好不好”，而是“预算治理链有没有断点”。</p>
+<h2>Next Read</h2>
+<ul>
+<li><code>multi-stage-compaction-pipeline</code></li>
+<li><code>build-a-minimal-query-loop</code></li>
+</ul></div>
+    <p class="footer">Markdown 源文件： <code>contents/10-mechanism/context-budget-and-tool-result-storage.md</code></p>
+  </article>
+</div></div></main>
+</body>
+</html>

@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Runtime entry and Turn life cycle</title>
+  <link rel="stylesheet" href="../assets/style.css" />
+  <script defer src="../assets/site.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container site-header-inner">
+      <a class="brand" href="../index.html">Lessons from Claude Code</a>
+      <div class="controls">
+        <a class="toggle-btn" href="../zh/articles/runtime-entry-and-turn-lifecycle.html">中文</a>
+        <button id="theme-toggle" class="toggle-btn" type="button">Light</button>
+      </div>
+      <nav class="nav" aria-label="Main"><a class="" href="../index.html">Home</a><a class="" href="../map.html">Map</a><a class="active" href="../mechanism.html">Mechanism</a><a class="" href="../decision.html">Decision</a><a class="" href="../build.html">Build</a></nav>
+    </div>
+  </header>
+  <main class="main"><div class="container"><p class="lead"><a href="../mechanism.html">Back to Mechanism</a></p>
+<div class="article-layout">
+  <aside class="article-sidebar">
+  <h3>Mechanism</h3>
+  <p class="lead"><a href="../mechanism.html">Back to Mechanism</a></p>
+  <h3>Track Articles</h3>
+  <nav class="sidebar-nav"><a class='active' href='runtime-entry-and-turn-lifecycle.html'>Runtime entry and Turn life cycle</a><a class='' href='query-loop-state-machine-and-continue-transitions.html'>Query Loop state machine and Continue migration</a><a class='' href='tool-contract-and-dispatch-pipeline.html'>Tool Contracts and Distribution Execution Pipelines</a><a class='' href='context-budget-and-tool-result-storage.html'>Contextual Budgeting and Tool Result Storage Governance</a><a class='' href='permissions-runtime-evaluation.html'>Runtime decision chain of permission system</a><a class='' href='multi-stage-compaction-pipeline.html'>Multi-stage context compression pipeline</a></nav>
+  <h3>Prerequisites</h3>
+  <ul><li><a href='architecture-map.html'><code>architecture-map</code></a></li><li><a href='evidence-model-and-claim-discipline.html'><code>evidence-model-and-claim-discipline</code></a></li></ul>
+  <h3>Code Anchors</h3>
+  <ul><li><code>claude-code-main/src/QueryEngine.ts</code><br/><span class='lead'>QueryEngine, submitMessage</span></li><li><code>claude-code-main/src/query.ts</code><br/><span class='lead'>queryLoop, turn orchestration</span></li><li><code>claude-code-main/src/query/tokenBudget.ts</code><br/><span class='lead'>budget guardrails</span></li></ul>
+</aside>
+  <article class="article">
+    <h1>Runtime entry and Turn life cycle</h1>
+    <p class="lead">From submitMessage to round submission, dismantle how a user input enters the main loop and is implemented as session state.</p>
+    <div class="meta">
+      <span class="badge">advanced</span>
+      <span class="badge">L2</span>
+      <span class="badge">E1</span>
+      <span class="badge">Updated 2026-04-06</span>
+    </div>
+    <div class="meta"><span class='tag'>runtime</span><span class='tag'>query-engine</span><span class='tag'>lifecycle</span></div>
+    <div class="article-body"><h1>Runtime entry and Turn life cycle</h1>
+<blockquote>
+<p>A user input goes from "pressing enter" to "becoming resumable" with more than one API call in between.
+In a production system, this is a strict life cycle chain.</p>
+</blockquote>
+<h2>1. Let’s look at the big picture first: what exactly happens in a turn</h2>
+<p>Intuitively the process is: input -&gt; model -&gt; output.
+Actually in a tool agent, the minimum link is:</p>
+<pre><code class="language-text">submitMessage -&gt; queryLoop -&gt; 模型步骤 -&gt; 工具步骤 -&gt; 状态提交
+</code></pre>
+<pre><code class="language-mermaid">flowchart LR
+  A[submitMessage] --&gt; B[queryLoop]
+  B --&gt; C[模型步骤]
+  C --&gt; D{是否 tool_use}
+  D -- 是 --&gt; E[工具执行与回注]
+  E --&gt; B
+  D -- 否 --&gt; F[终止判定]
+  F --&gt; G[提交回合结果]
+</code></pre>
+<p>Key point: <strong>"Display to user"</strong> and <strong>"Submit to session state"</strong> are two different stages.</p>
+<h2>2. Entry layer: What <code>QueryEngine</code> is doing</h2>
+<p>The responsibility of <code>claude-code-main/src/QueryEngine.ts</code> is not to "help you adjust the interface", but to "hold session sovereignty".</p>
+<ul>
+<li>Receive user messages.</li>
+<li>Assemble round parameters.</li>
+<li>Leave execution to <code>query.ts</code>.</li>
+<li>Finally gather and submit the round results.</li>
+</ul>
+<p>Among them, <code>submitMessage()</code> determines the turn identity and turn boundary.</p>
+<h2>3. Execution layer: <code>queryLoop</code> is the runtime kernel</h2>
+<p>The loop in <code>claude-code-main/src/query.ts</code> is more like a state machine than a function call.</p>
+<pre><code class="language-typescript">while (true) {
+  const step = await callModel(...)
+  if (step.toolCalls.length) {
+    const results = await runTools(step.toolCalls)
+    state = appendToolResults(state, results)
+    continue
+  }
+  state = commitAssistant(state, step.output)
+  break
+}
+</code></pre>
+<p>The core of this instruction is: <strong>The state continues to evolve within the same round and is submitted uniformly at the end. </strong></p>
+<h2>4. Why "streaming output" cannot equal "round submission"</h2>
+<p>If the streaming token is directly used as the final state, it will lead to:</p>
+<ol>
+<li>The tool may not have finished executing yet.</li>
+<li>Rounds may subsequently trigger retries or compactions.</li>
+<li>Missing consistent commit point when recovering from interruption.</li>
+</ol>
+<p>So it should be:</p>
+<ul>
+<li>The UI displays the flow (experience layer) first.</li>
+<li>Submit after the termination conditions are met (status layer).</li>
+</ul>
+<h2>5. The two most easily overlooked boundaries</h2>
+<h3>Boundary A: Budget Boundary</h3>
+<p><code>claude-code-main/src/query/tokenBudget.ts</code> Relevant logic explanation: Budget inspection must be carried out in advance, not as an afterthought.</p>
+<h3>Boundary B: Retry Boundary</h3>
+<p>The retry must reuse the original round identity, otherwise it will form a history of "apparent continuation but actual fork".</p>
+<h2>6. Common fault paths</h2>
+<ol>
+<li>The system displays streaming text first.</li>
+<li>The tool times out, triggering a retry.</li>
+<li>Retrying does not reuse the original round state.</li>
+<li>The final history appears conflicting output.</li>
+</ol>
+<p>This type of problem is essentially a life cycle management problem, not a model capability problem.</p>
+<h2>7. Check items that can be copied directly</h2>
+<ul>
+<li>Is there a unique turn ID.</li>
+<li>Whether to separate "display" and "submit".</li>
+<li>Whether the continue branch has complete status.</li>
+<li>Whether to bury points at the round boundary (start/return/submit/fail).</li>
+</ul>
+<h2>8. Summary</h2>
+<p><strong>turn life cycle is a system capability, not an implementation detail. </strong></p>
+<h2>Next Read</h2>
+<ul>
+<li><code>query-loop-state-machine-and-continue-transitions</code></li>
+<li><code>context-budget-and-tool-result-storage</code></li>
+</ul></div>
+    <p class="footer">Source markdown: <code>contents/10-mechanism/runtime-entry-and-turn-lifecycle_EN.md</code></p>
+  </article>
+</div></div></main>
+</body>
+</html>

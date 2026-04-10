@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>多阶段上下文压缩管线</title>
+  <link rel="stylesheet" href="../../assets/style.css" />
+  <script defer src="../../assets/site.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container site-header-inner">
+      <a class="brand" href="../index.html">Lessons from Claude Code</a>
+      <div class="controls">
+        <a class="toggle-btn" href="../../articles/multi-stage-compaction-pipeline.html">English</a>
+        <button id="theme-toggle" class="toggle-btn" type="button">Light</button>
+      </div>
+      <nav class="nav" aria-label="Main"><a class="" href="../index.html">首页</a><a class="" href="../map.html">地图</a><a class="active" href="../mechanism.html">机制</a><a class="" href="../decision.html">决策</a><a class="" href="../build.html">复建</a></nav>
+    </div>
+  </header>
+  <main class="main"><div class="container"><p class="lead"><a href="../mechanism.html">返回 机制</a></p>
+<div class="article-layout">
+  <aside class="article-sidebar">
+  <h3>机制</h3>
+  <p class="lead"><a href="../mechanism.html">返回 机制</a></p>
+  <h3>同轨文章</h3>
+  <nav class="sidebar-nav"><a class='' href='runtime-entry-and-turn-lifecycle.html'>运行时入口与 Turn 生命周期</a><a class='' href='query-loop-state-machine-and-continue-transitions.html'>Query Loop 状态机与 Continue 迁移</a><a class='' href='tool-contract-and-dispatch-pipeline.html'>工具契约与分发执行管线</a><a class='' href='context-budget-and-tool-result-storage.html'>上下文预算与工具结果存储治理</a><a class='' href='permissions-runtime-evaluation.html'>权限系统的运行时判定链</a><a class='active' href='multi-stage-compaction-pipeline.html'>多阶段上下文压缩管线</a></nav>
+  <h3>前置阅读</h3>
+  <ul><li><a href='context-budget-and-tool-result-storage.html'><code>context-budget-and-tool-result-storage</code></a></li></ul>
+  <h3>代码锚点</h3>
+  <ul><li><code>claude-code-main/src/query.ts</code><br/><span class='lead'>snip, microcompact, autocompact call order</span></li><li><code>claude-code-main/src/services/compact/autoCompact.ts</code><br/><span class='lead'>threshold, failure breaker</span></li><li><code>claude-code-main/src/services/compact/compact.ts</code><br/><span class='lead'>compaction flow</span></li><li><code>claude-code-main/src/services/compact/sessionMemoryCompact.ts</code><br/><span class='lead'>session memory branch</span></li></ul>
+</aside>
+  <article class="article">
+    <h1>多阶段上下文压缩管线</h1>
+    <p class="lead">拆解 snip、microcompact、autocompact 与 session memory compact 的触发顺序与断路机制。</p>
+    <div class="meta">
+      <span class="badge">advanced</span>
+      <span class="badge">L2</span>
+      <span class="badge">E1</span>
+      <span class="badge">更新 2026-04-06</span>
+    </div>
+    <div class="meta"><span class='tag'>compaction</span><span class='tag'>context</span><span class='tag'>reliability</span><span class='tag'>circuit-breaker</span></div>
+    <div class="article-body"><h1>多阶段上下文压缩管线</h1>
+<blockquote>
+<p>“压缩”听起来像一个动作，生产系统里它其实是一条连续控制链。<br>
+这条链处理的不只是 token 数量，还处理失败恢复与语义保真。</p>
+</blockquote>
+<h2>1. 为什么单步压缩一定会撞墙</h2>
+<p>很多第一版实现是：</p>
+<pre><code class="language-python">if tokens &gt; threshold:
+    messages = summarize(messages)
+</code></pre>
+<p>这在短会话可能够用，但在工具密集长会话里会遇到两个问题：</p>
+<ul>
+<li>压缩力度太弱：压不下来。</li>
+<li>压缩力度太强：关键信息被抹平。</li>
+</ul>
+<p>所以必须做分阶段，而不是单阶段。</p>
+<h2>2. 在源码里看压缩链条</h2>
+<p>从 <code>claude-code-main/src/query.ts</code> 到 <code>services/compact/*</code>，可以看到清晰分层：</p>
+<ol>
+<li><code>snip</code>：低成本裁剪，优先保留结构。</li>
+<li><code>microcompact</code>：中强度压缩，处理局部膨胀。</li>
+<li><code>autocompact</code>：高压阈值下的自动压缩。</li>
+<li><code>sessionMemoryCompact</code>：面向会话记忆边界的专项路径。</li>
+</ol>
+<p>这四层对应四种压力状态，而不是“同一个函数的四个参数”。</p>
+<h2>3. 断路器为什么是必须项</h2>
+<p><code>claude-code-main/src/services/compact/autoCompact.ts</code> 的断路逻辑解决的是一个真实风险：<br>
+压缩本身也会失败，如果失败后盲目重试，系统会进入压缩风暴。</p>
+<p>示意：</p>
+<pre><code class="language-text">超压 -&gt; 压缩失败 -&gt; 继续超压 -&gt; 再压缩失败 -&gt; ...
+</code></pre>
+<p>没有断路器时，这条链不会自然收敛。</p>
+<h2>4. 压缩成功不等于系统可用</h2>
+<p>这是很容易被忽略的一点。<br>
+压缩成功只说明 token 下降，不说明状态可用。</p>
+<p>真正需要确认的是：</p>
+<ul>
+<li>任务目标是否仍清晰。</li>
+<li>工具结果引用是否仍可追溯。</li>
+<li>下一轮是否还能做正确决策。</li>
+</ul>
+<p>如果这些没保住，系统只是“活着”，不是“工作着”。</p>
+<h2>5. session memory branch 的意义</h2>
+<p><code>sessionMemoryCompact.ts</code> 代表一个关键工程判断：<br>
+会话记忆和普通消息不能完全同策略处理。</p>
+<p>原因很简单：</p>
+<ul>
+<li>会话记忆包含跨轮决策线索。</li>
+<li>这些线索一旦丢失，后续行为会看起来“突然变笨”。</li>
+</ul>
+<p>所以单独分支不是复杂化，而是保边界。</p>
+<h2>6. 一条可执行的压缩治理建议</h2>
+<p>你可以按这个顺序落地：</p>
+<ol>
+<li>先加入口预算检查。</li>
+<li>再加 <code>snip</code> + <code>microcompact</code>。</li>
+<li>再加 <code>autocompact</code> 与断路计数。</li>
+<li>最后再处理 session memory 专项策略。</li>
+</ol>
+<p>不要反过来。先把基础层做稳，再做高级层。</p>
+<h2>7. 常见事故信号</h2>
+<p>以下信号出现两个以上，就该检查压缩管线：</p>
+<ul>
+<li>单回合压缩触发次数异常上升。</li>
+<li>压缩后工具重试率明显上升。</li>
+<li>会话后半段回答一致性明显下降。</li>
+</ul>
+<p>这些往往不是模型退化，而是压缩策略失配。</p>
+<h2>8. 小结</h2>
+<p>多阶段压缩的核心不是“更聪明地摘要”，而是：<br>
+<strong>把上下文压力控制从一次性操作升级为可治理流程。</strong></p>
+<h2>Next Read</h2>
+<ul>
+<li><code>why-query-loop-owns-control-plane</code></li>
+<li><code>build-a-minimal-query-loop</code></li>
+</ul></div>
+    <p class="footer">Markdown 源文件： <code>contents/10-mechanism/multi-stage-compaction-pipeline.md</code></p>
+  </article>
+</div></div></main>
+</body>
+</html>

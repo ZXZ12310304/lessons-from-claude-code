@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>构建安全可控的工具运行时</title>
+  <link rel="stylesheet" href="../../assets/style.css" />
+  <script defer src="../../assets/site.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container site-header-inner">
+      <a class="brand" href="../index.html">Lessons from Claude Code</a>
+      <div class="controls">
+        <a class="toggle-btn" href="../../articles/build-a-safe-tool-runtime.html">English</a>
+        <button id="theme-toggle" class="toggle-btn" type="button">Light</button>
+      </div>
+      <nav class="nav" aria-label="Main"><a class="" href="../index.html">首页</a><a class="" href="../map.html">地图</a><a class="" href="../mechanism.html">机制</a><a class="" href="../decision.html">决策</a><a class="active" href="../build.html">复建</a></nav>
+    </div>
+  </header>
+  <main class="main"><div class="container"><p class="lead"><a href="../build.html">返回 复建</a></p>
+<div class="article-layout">
+  <aside class="article-sidebar">
+  <h3>复建</h3>
+  <p class="lead"><a href="../build.html">返回 复建</a></p>
+  <h3>同轨文章</h3>
+  <nav class="sidebar-nav"><a class='' href='build-a-minimal-query-loop.html'>复建一个最小可用 Query Loop</a><a class='active' href='build-a-safe-tool-runtime.html'>构建安全可控的工具运行时</a></nav>
+  <h3>前置阅读</h3>
+  <ul><li><a href='tool-contract-and-dispatch-pipeline.html'><code>tool-contract-and-dispatch-pipeline</code></a></li><li><a href='why-permission-check-order-is-boundary.html'><code>why-permission-check-order-is-boundary</code></a></li></ul>
+  <h3>代码锚点</h3>
+  <ul><li><code>claude-code-main/src/Tool.ts</code><br/><span class='lead'>tool contract fields</span></li><li><code>claude-code-main/src/utils/permissions/filesystem.ts</code><br/><span class='lead'>policy evaluation</span></li><li><code>claude-code-main/src/services/tools/StreamingToolExecutor.ts</code><br/><span class='lead'>execution streaming</span></li></ul>
+</aside>
+  <article class="article">
+    <h1>构建安全可控的工具运行时</h1>
+    <p class="lead">以实现视角给出工具运行时清单：契约约束、权限网关、并发控制、结果治理。</p>
+    <div class="meta">
+      <span class="badge">advanced</span>
+      <span class="badge">L3</span>
+      <span class="badge">E2</span>
+      <span class="badge">更新 2026-04-06</span>
+    </div>
+    <div class="meta"><span class='tag'>build</span><span class='tag'>tool-runtime</span><span class='tag'>safety</span><span class='tag'>policy</span></div>
+    <div class="article-body"><h1>构建安全可控的工具运行时</h1>
+<blockquote>
+<p>工具运行时是 coding agent 事故高发区。先把护栏立起来，再谈能力扩展。</p>
+</blockquote>
+<h2>1. 四层最小架构</h2>
+<pre><code class="language-mermaid">graph TD
+  A[契约层 Contract] --&gt; B[权限层 Policy Gate]
+  B --&gt; C[调度层 Orchestrator]
+  C --&gt; D[执行层 Executor]
+  D --&gt; E[结果治理 Result Budget]
+  E --&gt; F[回注 Query Loop]
+</code></pre>
+<p>这六个节点里，任意一个缺失都会直接放大故障概率。</p>
+<h2>2. 契约层</h2>
+<p>每个工具必须至少声明：</p>
+<ul>
+<li><code>inputSchema</code></li>
+<li><code>isReadOnly</code></li>
+<li><code>isConcurrencySafe</code></li>
+<li><code>maxResultSize</code></li>
+</ul>
+<p>没有契约，后续策略层无法做确定性判断。</p>
+<h2>3. 权限层</h2>
+<p>执行前固定走策略判定：</p>
+<pre><code class="language-text">schema 校验 -&gt; deny/ask/allow -&gt; 附加安全检查 -&gt; 执行
+</code></pre>
+<p>重点是“执行前”与“不可绕过”。</p>
+<h2>4. 调度层</h2>
+<p>默认串行，按契约放开并发：</p>
+<ul>
+<li>读工具优先并发。</li>
+<li>写工具独占批次。</li>
+<li>高风险工具单独审批。</li>
+</ul>
+<h2>5. 执行层</h2>
+<p>引入流式事件（进度/结果/错误）有三个价值：</p>
+<ol>
+<li>用户可见。</li>
+<li>调试可见。</li>
+<li>中断可见。</li>
+</ol>
+<h2>6. 结果治理层</h2>
+<p>大结果不要直接塞回上下文，改成“外置 + 引用”。<br>
+否则工具越成功，上下文越拥挤，后续推理越退化。</p>
+<h2>7. 上线前检查</h2>
+<ul>
+<li>并发写工具是否被正确阻断。</li>
+<li>权限冲突场景是否稳定复现。</li>
+<li>大结果是否能按引用回读。</li>
+<li>中断后状态是否可恢复。</li>
+</ul>
+<h2>8. 小结</h2>
+<p>安全工具运行时不是“多加几条 if”，而是把契约、权限、调度、执行、结果治理连成一条可审计链。</p>
+<h2>Next Read</h2>
+<ul>
+<li><code>multi-stage-compaction-pipeline</code></li>
+</ul></div>
+    <p class="footer">Markdown 源文件： <code>contents/30-build/build-a-safe-tool-runtime.md</code></p>
+  </article>
+</div></div></main>
+</body>
+</html>

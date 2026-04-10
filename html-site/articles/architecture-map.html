@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Architecture Maps: How Developers Read Lessons from Claude Code V2</title>
+  <link rel="stylesheet" href="../assets/style.css" />
+  <script defer src="../assets/site.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container site-header-inner">
+      <a class="brand" href="../index.html">Lessons from Claude Code</a>
+      <div class="controls">
+        <a class="toggle-btn" href="../zh/articles/architecture-map.html">中文</a>
+        <button id="theme-toggle" class="toggle-btn" type="button">Light</button>
+      </div>
+      <nav class="nav" aria-label="Main"><a class="" href="../index.html">Home</a><a class="active" href="../map.html">Map</a><a class="" href="../mechanism.html">Mechanism</a><a class="" href="../decision.html">Decision</a><a class="" href="../build.html">Build</a></nav>
+    </div>
+  </header>
+  <main class="main"><div class="container"><p class="lead"><a href="../map.html">Back to Map</a></p>
+<div class="article-layout">
+  <aside class="article-sidebar">
+  <h3>Map</h3>
+  <p class="lead"><a href="../map.html">Back to Map</a></p>
+  <h3>Track Articles</h3>
+  <nav class="sidebar-nav"><a class='active' href='architecture-map.html'>Architecture Maps: How Developers Read Lessons from Claude Code V2</a><a class='' href='evidence-model-and-claim-discipline.html'>Evidence model: Separating code facts from inference</a></nav>
+  <h3>Prerequisites</h3>
+  <ul><li class='lead'>None</li></ul>
+  <h3>Code Anchors</h3>
+  <ul><li><code>claude-code-main/src/QueryEngine.ts</code><br/><span class='lead'>QueryEngine, submitMessage</span></li><li><code>claude-code-main/src/query.ts</code><br/><span class='lead'>queryLoop, state transitions</span></li><li><code>claude-code-main/src/Tool.ts</code><br/><span class='lead'>Tool contract</span></li></ul>
+</aside>
+  <article class="article">
+    <h1>Architecture Maps: How Developers Read Lessons from Claude Code V2</h1>
+    <p class="lead">Define how to use the site from three dimensions: reading path, evidence specifications, and chapter dependencies, to avoid &quot;just watching the excitement without looking at the mechanism.&quot;</p>
+    <div class="meta">
+      <span class="badge">intermediate</span>
+      <span class="badge">L1</span>
+      <span class="badge">E2</span>
+      <span class="badge">Updated 2026-04-06</span>
+    </div>
+    <div class="meta"><span class='tag'>reading-map</span><span class='tag'>developer-docs</span><span class='tag'>information-architecture</span></div>
+    <div class="article-body"><h1>Architecture Maps: How Developers Read Lessons from Claude Code V2</h1>
+<blockquote>
+<p>This is not a "Summary of Contents" but a "Reading Agreement."
+After reading it, you should know where to start, what to take from each article, and when to stop and implement it yourself.</p>
+</blockquote>
+<h2>1. Take a look at the big picture first: what exactly is this site doing?</h2>
+<p>This project is no longer an "event introduction station", but an engineering analysis station for developers. There are three core goals:</p>
+<ol>
+<li>Explain clearly the operating mechanism in the source code (not the news).</li>
+<li>Make design decisions clear (not just "how").</li>
+<li>Provide a reconstruction path that can be directly implemented (not just talking about opinions).</li>
+</ol>
+<p>Corresponding to the site structure, there are five tracks:</p>
+<ul>
+<li><code>map</code>: Reading methods and evidence specifications.</li>
+<li><code>mechanism</code>: Disassembly of the operating mechanism.</li>
+<li><code>decision</code>: Architectural trade-offs and boundaries.</li>
+<li><code>build</code>: Minimal implementation and project listing.</li>
+</ul>
+<h2>2. Why is it organized like this?</h2>
+<p>A lot of similar content will be stuck at two extremes:</p>
+<ul>
+<li>Only big words: "I understand" after reading, but I can't do it.</li>
+<li>Just post the code: I "saw" it after reading it, but I don't know why.</li>
+</ul>
+<p>We use a two-line structure to separate these two problems:</p>
+<pre><code class="language-text">机制线（What happens）  -&gt;  决策线（Why this design）
+          \                        /
+           \                      /
+            ------ 复建线（How to build）
+</code></pre>
+<p>The mechanism line gives facts, the decision line gives reasons, and the reconstruction line gives actions.</p>
+<h2>3. The default reading order of this set of articles</h2>
+<p>If this is your first time here, it is recommended to follow the following order:</p>
+<pre><code class="language-mermaid">flowchart LR
+  A[runtime-entry-and-turn-lifecycle] --&gt; B[query-loop-state-machine-and-continue-transitions]
+  B --&gt; C[tool-contract-and-dispatch-pipeline]
+  C --&gt; D[permissions-runtime-evaluation]
+  D --&gt; E[multi-stage-compaction-pipeline]
+  E --&gt; F[why-query-loop-owns-control-plane]
+  F --&gt; G[build-a-minimal-query-loop]
+</code></pre>
+<p>The advantage of this path is: you first understand "how the system runs", then look at "why it is designed this way", and finally "build your own version".</p>
+<h2>4. How to use code anchors</h2>
+<p>Subsequent articles will repeatedly reference these core entrances:</p>
+<ul>
+<li><code>claude-code-main/src/QueryEngine.ts</code></li>
+<li><code>claude-code-main/src/query.ts</code></li>
+<li><code>claude-code-main/src/Tool.ts</code></li>
+</ul>
+<p>Please think of them as "general guideposts" rather than "specific details."
+When reading the mechanism document, first confirm the position of these entries in the call chain, and then look at the partial implementation, otherwise it is easy to get lost in the details.</p>
+<h2>5. Three misunderstandings to avoid when reading</h2>
+<h3>Misunderstanding A: Treating model capabilities as system capabilities</h3>
+<p>Just because the model answers well does not mean it is stable at runtime.
+Most of the production-level problems lie in the "non-model layers" such as cycle control, authority sequence, and budget management.</p>
+<h3>Misunderstanding B: Understanding security as a pop-up window</h3>
+<p>The pop-up window is the UI, and the safety boundary is in the determination order.
+<code>deny -&gt; ask -&gt; allow</code> Once the order is misaligned, no matter how beautiful the UI is, it cannot stop the risk.</p>
+<h3>Misunderstanding C: Treat compression as a summarize function</h3>
+<p>Long session sustainability is not just a matter of "pressing it down", but a combination of budget checking, layered compression, result externalization, and readback paths.</p>
+<h2>6. How you can use this content</h2>
+<p>Two practical methods:</p>
+<ul>
+<li><strong>Architecture review mode</strong>: Read mechanism + decision first, in groups of two, and output the review conclusion.</li>
+<li><strong>Implementation-driven mode</strong>: Read the build directly, and then read back the mechanism to align the design boundaries.</li>
+</ul>
+<p>A simple template:</p>
+<pre><code class="language-markdown">模块：
+当前实现：
+对应机制文章：
+对应决策文章：
+本团队取舍：
+一周内可执行改动：
+</code></pre>
+<h2>7. Constraints on writing on this site (you’ll see it all the time)</h2>
+<p>Each article has 8 fixed paragraphs: problem, constraints, anchors, running sequence, failure mode, trade-offs, reconstruction checklist, and next article.
+It is not for the sake of uniformity of form, but to make the article reusable by the engineering team without relying on the author's personal expression style.</p>
+<h2>8. What should you do after reading this?</h2>
+<p>Open directly:</p>
+<ul>
+<li><code>evidence-model-and-claim-discipline</code> (Put the rules of evidence into your head first)</li>
+<li><code>runtime-entry-and-turn-lifecycle</code> (enter the first mechanism text)</li>
+</ul></div>
+    <p class="footer">Source markdown: <code>contents/00-map/architecture-map_EN.md</code></p>
+  </article>
+</div></div></main>
+</body>
+</html>

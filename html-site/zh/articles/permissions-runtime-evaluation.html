@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>权限系统的运行时判定链</title>
+  <link rel="stylesheet" href="../../assets/style.css" />
+  <script defer src="../../assets/site.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container site-header-inner">
+      <a class="brand" href="../index.html">Lessons from Claude Code</a>
+      <div class="controls">
+        <a class="toggle-btn" href="../../articles/permissions-runtime-evaluation.html">English</a>
+        <button id="theme-toggle" class="toggle-btn" type="button">Light</button>
+      </div>
+      <nav class="nav" aria-label="Main"><a class="" href="../index.html">首页</a><a class="" href="../map.html">地图</a><a class="active" href="../mechanism.html">机制</a><a class="" href="../decision.html">决策</a><a class="" href="../build.html">复建</a></nav>
+    </div>
+  </header>
+  <main class="main"><div class="container"><p class="lead"><a href="../mechanism.html">返回 机制</a></p>
+<div class="article-layout">
+  <aside class="article-sidebar">
+  <h3>机制</h3>
+  <p class="lead"><a href="../mechanism.html">返回 机制</a></p>
+  <h3>同轨文章</h3>
+  <nav class="sidebar-nav"><a class='' href='runtime-entry-and-turn-lifecycle.html'>运行时入口与 Turn 生命周期</a><a class='' href='query-loop-state-machine-and-continue-transitions.html'>Query Loop 状态机与 Continue 迁移</a><a class='' href='tool-contract-and-dispatch-pipeline.html'>工具契约与分发执行管线</a><a class='' href='context-budget-and-tool-result-storage.html'>上下文预算与工具结果存储治理</a><a class='active' href='permissions-runtime-evaluation.html'>权限系统的运行时判定链</a><a class='' href='multi-stage-compaction-pipeline.html'>多阶段上下文压缩管线</a></nav>
+  <h3>前置阅读</h3>
+  <ul><li><a href='tool-contract-and-dispatch-pipeline.html'><code>tool-contract-and-dispatch-pipeline</code></a></li></ul>
+  <h3>代码锚点</h3>
+  <ul><li><code>claude-code-main/src/utils/permissions/PermissionMode.ts</code><br/><span class='lead'>permission modes</span></li><li><code>claude-code-main/src/utils/permissions/filesystem.ts</code><br/><span class='lead'>read checks, write checks, order of evaluation</span></li><li><code>claude-code-main/src/utils/permissions/permissionSetup.ts</code><br/><span class='lead'>dangerous rule detection</span></li><li><code>claude-code-main/src/utils/bash/treeSitterAnalysis.ts</code><br/><span class='lead'>shell AST analysis</span></li></ul>
+</aside>
+  <article class="article">
+    <h1>权限系统的运行时判定链</h1>
+    <p class="lead">从权限模式、规则优先级、shell 安全分析三层拆解运行时安全边界。</p>
+    <div class="meta">
+      <span class="badge">advanced</span>
+      <span class="badge">L2</span>
+      <span class="badge">E1</span>
+      <span class="badge">更新 2026-04-06</span>
+    </div>
+    <div class="meta"><span class='tag'>permissions</span><span class='tag'>policy</span><span class='tag'>security</span><span class='tag'>runtime-governance</span></div>
+    <div class="article-body"><h1>权限系统的运行时判定链</h1>
+<blockquote>
+<p>权限弹窗只是 UI。真正的安全边界是判定顺序与不可绕过检查。</p>
+</blockquote>
+<h2>1. 核心问题</h2>
+<p>如果只做“是否弹窗”，系统会在易用性和安全性之间反复摆动。<br>
+成熟做法是把权限设计为可审计的运行时判定链。</p>
+<h2>2. 运行链示意</h2>
+<pre><code class="language-mermaid">flowchart TD
+  A[解析权限模式] --&gt; B[匹配 deny 规则]
+  B --&gt;|命中| X[拒绝]
+  B --&gt;|未命中| C[匹配 ask 规则]
+  C --&gt;|命中| D[请求确认]
+  D --&gt;|拒绝| X
+  D --&gt;|同意| E[附加安全检查]
+  C --&gt;|未命中| F[匹配 allow 规则]
+  F --&gt;|命中| E
+  F --&gt;|未命中| G[默认策略]
+  G --&gt; E
+  E --&gt;|通过| Y[允许执行]
+  E --&gt;|失败| X
+</code></pre>
+<h2>3. 模式层与执行层</h2>
+<ul>
+<li><code>PermissionMode.ts</code>：定义模式入口（保守/自动等）。</li>
+<li><code>filesystem.ts</code>：定义读写评估顺序。</li>
+<li><code>permissionSetup.ts</code>：配置加载时拦截危险规则。</li>
+<li><code>treeSitterAnalysis.ts</code>：对 shell 做结构化风险分析。</li>
+</ul>
+<p>模式层决定“倾向”，执行层决定“结果”。</p>
+<h2>4. 为什么写操作要更严格</h2>
+<p>读失败通常只是信息不足；写失败可能是不可逆损坏。<br>
+因此写路径应有附加检查，不可与读路径同强度处理。</p>
+<h2>5. 为什么不能只靠 regex 检查命令</h2>
+<p>危险命令很多是结构组合风险，不是单词命中风险。<br>
+<code>tree-sitter</code>/AST 分析成本更高，但能降低漏检率。</p>
+<h2>6. 常见故障</h2>
+<ul>
+<li>allow 早于 deny，边界反转。</li>
+<li>不同表面（文件/shell）用不同顺序。</li>
+<li>日志只有结果没有命中路径。</li>
+</ul>
+<h2>7. 可执行建议</h2>
+<ul>
+<li>固化判定顺序并单测。</li>
+<li>写与读分层策略。</li>
+<li>配置加载阶段加 lint。</li>
+<li>权限日志记录完整命中链。</li>
+</ul>
+<h2>8. 小结</h2>
+<p>权限系统的本质不是“问不问用户”，而是“能不能稳定给出可解释决策”。</p>
+<h2>Next Read</h2>
+<ul>
+<li><code>why-permission-check-order-is-boundary</code></li>
+<li><code>build-a-safe-tool-runtime</code></li>
+</ul></div>
+    <p class="footer">Markdown 源文件： <code>contents/10-mechanism/permissions-runtime-evaluation.md</code></p>
+  </article>
+</div></div></main>
+</body>
+</html>

@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Rebuild a minimal usable Query Loop</title>
+  <link rel="stylesheet" href="../assets/style.css" />
+  <script defer src="../assets/site.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container site-header-inner">
+      <a class="brand" href="../index.html">Lessons from Claude Code</a>
+      <div class="controls">
+        <a class="toggle-btn" href="../zh/articles/build-a-minimal-query-loop.html">中文</a>
+        <button id="theme-toggle" class="toggle-btn" type="button">Light</button>
+      </div>
+      <nav class="nav" aria-label="Main"><a class="" href="../index.html">Home</a><a class="" href="../map.html">Map</a><a class="" href="../mechanism.html">Mechanism</a><a class="" href="../decision.html">Decision</a><a class="active" href="../build.html">Build</a></nav>
+    </div>
+  </header>
+  <main class="main"><div class="container"><p class="lead"><a href="../build.html">Back to Build</a></p>
+<div class="article-layout">
+  <aside class="article-sidebar">
+  <h3>Build</h3>
+  <p class="lead"><a href="../build.html">Back to Build</a></p>
+  <h3>Track Articles</h3>
+  <nav class="sidebar-nav"><a class='active' href='build-a-minimal-query-loop.html'>Rebuild a minimal usable Query Loop</a><a class='' href='build-a-safe-tool-runtime.html'>Build safe and controllable tool runtimes</a></nav>
+  <h3>Prerequisites</h3>
+  <ul><li><a href='runtime-entry-and-turn-lifecycle.html'><code>runtime-entry-and-turn-lifecycle</code></a></li><li><a href='tool-contract-and-dispatch-pipeline.html'><code>tool-contract-and-dispatch-pipeline</code></a></li></ul>
+  <h3>Code Anchors</h3>
+  <ul><li><code>claude-code-main/src/query.ts</code><br/><span class='lead'>loop skeleton</span></li><li><code>claude-code-main/src/services/tools/toolOrchestration.ts</code><br/><span class='lead'>tool dispatch</span></li><li><code>claude-code-main/src/services/compact/autoCompact.ts</code><br/><span class='lead'>compaction threshold</span></li></ul>
+</aside>
+  <article class="article">
+    <h1>Rebuild a minimal usable Query Loop</h1>
+    <p class="lead">Provide the minimum main loop implementation that can be implemented: budget check, tool round, exit submission, retry guardrail.</p>
+    <div class="meta">
+      <span class="badge">intermediate</span>
+      <span class="badge">L3</span>
+      <span class="badge">E2</span>
+      <span class="badge">Updated 2026-04-06</span>
+    </div>
+    <div class="meta"><span class='tag'>build</span><span class='tag'>implementation</span><span class='tag'>query-loop</span></div>
+    <div class="article-body"><h1>Rebuild a minimal usable Query Loop</h1>
+<blockquote>
+<p>This article does not talk about the "ideal architecture", only the smallest version that "can be built within a week and will not turn over immediately".</p>
+</blockquote>
+<h2>1. What the minimum usable version must contain</h2>
+<p>If you have limited time, the minimum closed loop must have at least four blocks:</p>
+<ol>
+<li>Session state object (can be persisted across rounds).</li>
+<li>query loop (can handle continue).</li>
+<li>Tool distribution (can run the tool call and back-note).</li>
+<li>Budget check (can avoid the round directly exceeding the window).</li>
+</ol>
+<p>If any piece is missing, it is not "minimum usable", but "demo code".</p>
+<h2>2. The first version of the skeleton code</h2>
+<pre><code class="language-python">while True:
+    ctx = build_context(session)
+    enforce_budget(ctx)
+
+    step = call_model(ctx)
+    if step.tool_calls:
+        results = run_tools(step.tool_calls)
+        session = append_tool_results(session, results)
+        continue
+
+    session = commit_assistant_output(session, step.output)
+    break
+</code></pre>
+<p>The point of this skeleton is not "simple", but that it already has a closed loop.</p>
+<h2>3. Three engineering constraints that need to be addressed on the first day</h2>
+<h3>Constraint A: Separation of submission and display</h3>
+<p>Streaming output can be displayed first, but final commit must occur at a single point.
+Otherwise, it will be easy to fail to keep up with history during recovery.</p>
+<h3>Constraint B: Tool back-annotation must be structured</h3>
+<p>The tool output cannot be spliced ​​into history as a piece of free text.
+At least the tool name, call parameters, result summary, and result reference must be included.</p>
+<h3>Constraint C: Budget check must be preceded</h3>
+<p>Post-budget means that you have already paid the cost and then find that the limit is exceeded, which is a passive stop loss.</p>
+<h2>4. What should be added in the second stage (don’t do it all at the beginning)</h2>
+<p>建议按这个顺序迭代：</p>
+<ol>
+<li>Retry strategy (recoverable).</li>
+<li>Authority assessment (governability).</li>
+<li>Staged compression (sustainable).</li>
+</ol>
+<p>Don’t use complex memory systems and multiple agents at the beginning. Make the single loop stable first.</p>
+<h2>5. A practical directory suggestion</h2>
+<pre><code class="language-text">src/
+  runtime/
+    query_loop.py
+    session_state.py
+  tools/
+    contracts.py
+    orchestrator.py
+  safety/
+    permissions.py
+    budget.py
+</code></pre>
+<p>目录不重要，重要的是“主权收敛”：回合状态在一个地方收敛提交。</p>
+<h2>6. Verify whether this version is actually available</h2>
+<p>It is enough to do three sets of tests:</p>
+<ul>
+<li>Whether the status of the tool branch is consistent for three consecutive rounds of calls.</li>
+<li>Whether the simulation overwindow triggers budget control and continues to run.</li>
+<li>Whether the simulation can be restored to the correct round after being interrupted and restarted.</li>
+</ul>
+<p>If you pass three groups, add additional functions; if you pass three groups, don't add functions.</p>
+<h2>7. Common symptoms of “It looks like it can run, but it actually doesn’t work”</h2>
+<ul>
+<li>A new session object is created every round.</li>
+<li>After the tool fails, it is discarded directly without recording the status.</li>
+<li>The budget logic only prompts in the log and does not actually control the process.</li>
+</ul>
+<p>These problems are not painful in the early stage, but will be very painful after the flow increases.</p>
+<h2>8. Summary</h2>
+<p>The core of the smallest available query loop is not "less code", but "complete closed loop".
+Only when the closed loop is complete can it withstand subsequent complexity.</p>
+<h2>Next Read</h2>
+<ul>
+<li><code>build-a-safe-tool-runtime</code></li>
+</ul></div>
+    <p class="footer">Source markdown: <code>contents/30-build/build-a-minimal-query-loop_EN.md</code></p>
+  </article>
+</div></div></main>
+</body>
+</html>
